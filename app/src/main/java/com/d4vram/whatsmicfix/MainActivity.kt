@@ -6,6 +6,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.d4vram.whatsmicfix.R
 import java.io.File
 import kotlin.math.log10
 
@@ -15,83 +16,64 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvFactor: TextView
     private lateinit var seekBoost: SeekBar
 
-    private val PREFS_NAME = "whatsmicfix_prefs"
-    private val KEY_ENABLE = "enable_preboost"
-    private val KEY_FACTOR = "boost_factor" // guardamos 0.5..2.5
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_settings)
+        setContentView(R.layout.activity_settings) // <-- usa tu layout existente
 
         swEnable = findViewById(R.id.swEnable)
         tvFactor = findViewById(R.id.tvFactor)
         seekBoost = findViewById(R.id.seekBoost)
 
-        // Configurar rango 0.5×..2.5× => 50..250
+        // Rango 0.5×..2.5×  => progress 50..250
         seekBoost.max = 250
-        if (Build.VERSION.SDK_INT >= 26) {
-            seekBoost.min = 50
-        }
+        if (Build.VERSION.SDK_INT >= 26) seekBoost.min = 50
 
-        // Cargar valores guardados
-        val sp = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val enabled = sp.getBoolean(KEY_ENABLE, true)
-        val factor = sp.getFloat(KEY_FACTOR, 1.35f).coerceIn(0.5f, 2.5f)
+        val sp = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
+        val enabled = sp.getBoolean(Prefs.KEY_ENABLE, true)
+        val factor = sp.getFloat(Prefs.KEY_FACTOR, 1.35f).coerceIn(0.5f, 2.5f)
 
         swEnable.isChecked = enabled
         seekBoost.progress = (factor * 100).toInt().coerceIn(50, 250)
-        updateFactorLabel(enabled, factor)
+        updateLabel(enabled, factor)
 
-        // Listeners
         swEnable.setOnCheckedChangeListener { _, isChecked ->
             val f = progressToFactor(seekBoost.progress)
-            savePrefs(isChecked, f)
-            updateFactorLabel(isChecked, f)
+            save(isChecked, f); updateLabel(isChecked, f)
         }
 
         seekBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val f = progressToFactor(progress)
-                savePrefs(swEnable.isChecked, f)
-                updateFactorLabel(swEnable.isChecked, f)
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                val f = progressToFactor(p)
+                save(swEnable.isChecked, f); updateLabel(swEnable.isChecked, f)
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
-        // Asegura permisos de lectura la primera vez que abres la app
         makePrefsWorldReadable()
     }
 
-    private fun progressToFactor(progress: Int): Float {
-        // progress 50..250 -> 0.5..2.5
-        val p = progress.coerceIn(50, 250)
-        return p / 100f
-    }
+    private fun progressToFactor(p: Int) = p.coerceIn(50, 250) / 100f
 
-    private fun savePrefs(enabled: Boolean, factor: Float) {
-        val sp = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        sp.edit()
-            .putBoolean(KEY_ENABLE, enabled)
-            .putFloat(KEY_FACTOR, factor.coerceIn(0.5f, 2.5f))
+    private fun save(enabled: Boolean, factor: Float) {
+        getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
+            .putBoolean(Prefs.KEY_ENABLE, enabled)
+            .putFloat(Prefs.KEY_FACTOR, factor.coerceIn(0.5f, 2.5f))
             .apply()
         makePrefsWorldReadable()
     }
 
     private fun makePrefsWorldReadable() {
         try {
-            val f = File(applicationInfo.dataDir + "/shared_prefs/$PREFS_NAME.xml")
-            if (f.exists()) f.setReadable(true, false)
-        } catch (_: Throwable) { /* ignore */ }
+            File(applicationInfo.dataDir + "/shared_prefs/${Prefs.FILE}.xml")
+                .setReadable(true, false)
+        } catch (_: Throwable) {}
     }
 
-    private fun updateFactorLabel(enabled: Boolean, factor: Float) {
+    private fun updateLabel(enabled: Boolean, factor: Float) {
         val db = 20 * log10(factor.toDouble())
         val dbStr = if (db >= 0) "+%.1f dB".format(db) else "%.1f dB".format(db)
-        tvFactor.text = if (enabled) {
-            "Ganancia: x%.2f ($dbStr)".format(factor)
-        } else {
-            "Ganancia desactivada"
-        }
+        tvFactor.text = if (enabled) "Ganancia: x%.2f ($dbStr)".format(factor)
+        else "Ganancia desactivada"
     }
 }
