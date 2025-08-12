@@ -5,13 +5,23 @@
     <application
         android:allowBackup="false"
         android:label="WhatsMicFix"
-        android:icon="@android:drawable/ic_btn_speak_now">
+        android:icon="@android:drawable/ic_btn_speak_now"
+        android:theme="@style/Theme.WhatsMicFix">
         <meta-data android:name="xposedmodule" android:value="true" />
         <meta-data android:name="xposeddescription"
             android:value="Fuerza perfil de micro correcto en WhatsApp y habilita AGC/NS para arreglar audios bajos en Pixel 8/serie 8 (A14-A16)." />
-        <!-- XposedBridge 93+ es compatible con LSPosed moderno -->
         <meta-data android:name="xposedminversion" android:value="93" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="WhatsMicFix">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
-    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+    <uses-sdk android:minSdkVersion="24" />
 </manifest>

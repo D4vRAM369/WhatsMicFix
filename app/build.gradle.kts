@@ -52,4 +52,5 @@ dependencies {
     compileOnly("de.robv.android.xposed:api:82:sources")
 
     implementation("androidx.annotation:annotation:1.8.1")
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }

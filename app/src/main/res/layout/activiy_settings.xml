@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#111316">
+
+    <!-- Título -->
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="WhatsMicFix"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        android:textColor="#FFFFFF" />
+
+    <!-- Switch para activar/desactivar -->
+    <Switch
+        android:id="@+id/swEnable"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Activar pre-boost"
+        android:textColor="#FFFFFF" />
+
+    <!-- Texto que muestra el factor actual -->
+    <TextView
+        android:id="@+id/tvFactor"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Ganancia: x1.35 (+2.6 dB)"
+        android:textColor="#B0BEC5" />
+
+    <!-- Barra para ajustar ganancia -->
+    <SeekBar
+        android:id="@+id/seekBoost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:max="200"
+        android:progress="135" />
+
+    <!-- Texto con aviso sobre el rango -->
+    <TextView
+        android:id="@+id/tvRangeInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
+        android:textColor="#8FA3AD" />
+
+</LinearLayout>
