@@ -1,15 +1,37 @@
+# ==== Android Studio / IntelliJ ====
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.idea/
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# ==== Gradle ====
+.gradle/
+**/build/
 local.properties
+
+# ==== NDK / CMake ====
+.externalNativeBuild/
+.cxx/
+
+# ==== Capturas y datos locales ====
+captures/
+
+# ==== Binarios y llaves (¡NO subir!) ====
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# ==== Fastlane (si lo usas) ====
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+
+# ==== Sistema operativo ====
+.DS_Store
+Thumbs.db
+
