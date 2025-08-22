@@ -5,7 +5,6 @@ plugins {
 
 android {
     namespace = "com.d4vram.whatsmicfix"
-    // Si ya tienes Android 16 SDK instalado, puedes subir a 36 cuando esté estable.
     compileSdk = 35
 
     defaultConfig {
@@ -17,15 +16,21 @@ android {
     }
 
     buildTypes {
-        release {
+        getByName("release") {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
         }
-        debug {
+        getByName("debug") {
             isMinifyEnabled = false
+
+            // --- instalar en paralelo sin sobrescribir la 1.0 ---
+            applicationIdSuffix = ".v11"   // com.d4vram.whatsmicfix.v11
+            versionNameSuffix = "-v1.1"    // verás ...-v1.1 en Info de la app
+            // Si tu Manifest usa @string/app_name, puedes diferenciar el nombre visible:
+            // resValue("string", "app_name", "WhatsMicFix v1.1")
         }
     }
 
@@ -47,7 +52,7 @@ android {
 }
 
 dependencies {
-    // Xposed/LSPosed API (desde api.xposed.info, sin JitPack)
+    // Xposed/LSPosed API
     compileOnly("de.robv.android.xposed:api:82")
     compileOnly("de.robv.android.xposed:api:82:sources")
 
