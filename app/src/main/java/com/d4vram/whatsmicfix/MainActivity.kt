@@ -9,42 +9,64 @@ import androidx.appcompat.app.AppCompatActivity
 import com.d4vram.whatsmicfix.R
 import java.io.File
 import kotlin.math.log10
+import kotlin.math.pow
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var swEnable: Switch
+    private lateinit var swAdvanced: Switch
     private lateinit var tvFactor: TextView
+    private lateinit var tvRangeInfo: TextView
     private lateinit var seekBoost: SeekBar
+
+    // Mapeo del slider: 0..200 → BASIC_MIN_DB..currentMaxDb
+    private var currentMaxDb = Prefs.BASIC_MAX_DB
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_settings) // <-- usa tu layout existente
+        setContentView(R.layout.activity_settings)
 
-        swEnable = findViewById(R.id.swEnable)
-        tvFactor = findViewById(R.id.tvFactor)
-        seekBoost = findViewById(R.id.seekBoost)
+        swEnable   = findViewById(R.id.swEnable)
+        swAdvanced = findViewById(R.id.swAdvanced)
+        tvFactor   = findViewById(R.id.tvFactor)
+        tvRangeInfo= findViewById(R.id.tvRangeInfo)
+        seekBoost  = findViewById(R.id.seekBoost)
 
-        // Rango 0.5×..2.5×  => progress 50..250
-        seekBoost.max = 250
-        if (Build.VERSION.SDK_INT >= 26) seekBoost.min = 50
+        seekBoost.max = 200
+        if (Build.VERSION.SDK_INT >= 26) seekBoost.min = 0
 
         val sp = getSharedPreferences(Prefs.FILE, MODE_PRIVATE)
-        val enabled = sp.getBoolean(Prefs.KEY_ENABLE, true)
-        val factor = sp.getFloat(Prefs.KEY_FACTOR, 1.35f).coerceIn(0.5f, 2.5f)
+        val enabled  = sp.getBoolean(Prefs.KEY_ENABLE, true)
+        val adv      = sp.getBoolean(Prefs.KEY_ADV, false)
+        currentMaxDb = if (adv) Prefs.ADV_MAX_DB else Prefs.BASIC_MAX_DB
+        val savedDb  = sp.getFloat(Prefs.KEY_DB, 6f).coerceIn(Prefs.BASIC_MIN_DB, currentMaxDb)
 
         swEnable.isChecked = enabled
-        seekBoost.progress = (factor * 100).toInt().coerceIn(50, 250)
-        updateLabel(enabled, factor)
+        swAdvanced.isChecked = adv
+        seekBoost.progress = dbToProgress(savedDb, currentMaxDb)
+        updateRangeInfo()
+        updateLabel(enabled, savedDb)
 
         swEnable.setOnCheckedChangeListener { _, isChecked ->
-            val f = progressToFactor(seekBoost.progress)
-            save(isChecked, f); updateLabel(isChecked, f)
+            val db = progressToDb(seekBoost.progress, currentMaxDb)
+            save(isChecked, db, swAdvanced.isChecked)
+            updateLabel(isChecked, db)
+        }
+
+        swAdvanced.setOnCheckedChangeListener { _, isAdv ->
+            currentMaxDb = if (isAdv) Prefs.ADV_MAX_DB else Prefs.BASIC_MAX_DB
+            val db = progressToDb(seekBoost.progress, currentMaxDb).coerceIn(Prefs.BASIC_MIN_DB, currentMaxDb)
+            seekBoost.progress = dbToProgress(db, currentMaxDb)
+            save(swEnable.isChecked, db, isAdv)
+            updateRangeInfo()
+            updateLabel(swEnable.isChecked, db)
         }
 
         seekBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
-                val f = progressToFactor(p)
-                save(swEnable.isChecked, f); updateLabel(swEnable.isChecked, f)
+                val db = progressToDb(p, currentMaxDb)
+                save(swEnable.isChecked, db, swAdvanced.isChecked)
+                updateLabel(swEnable.isChecked, db)
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -53,13 +75,8 @@ class MainActivity : AppCompatActivity() {
         makePrefsWorldReadable()
     }
 
-    private fun progressToFactor(p: Int) = p.coerceIn(50, 250) / 100f
-
-    private fun save(enabled: Boolean, factor: Float) {
-        getSharedPreferences(Prefs.FILE, MODE_PRIVATE).edit()
-            .putBoolean(Prefs.KEY_ENABLE, enabled)
-            .putFloat(Prefs.KEY_FACTOR, factor.coerceIn(0.5f, 2.5f))
-            .apply()
+    private fun save(enabled: Boolean, db: Float, adv: Boolean) {
+        Prefs.saveFromUi(this, enabled, db, adv)
         makePrefsWorldReadable()
     }
 
@@ -70,10 +87,28 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Throwable) {}
     }
 
-    private fun updateLabel(enabled: Boolean, factor: Float) {
-        val db = 20 * log10(factor.toDouble())
-        val dbStr = if (db >= 0) "+%.1f dB".format(db) else "%.1f dB".format(db)
-        tvFactor.text = if (enabled) "Ganancia: x%.2f ($dbStr)".format(factor)
-        else "Ganancia desactivada"
+    private fun updateRangeInfo() {
+        val minX = dbToFactor(Prefs.BASIC_MIN_DB)
+        val maxX = dbToFactor(currentMaxDb)
+        val advText = if (swAdvanced.isChecked) " (avanzado)" else ""
+        tvRangeInfo.text = "Rango: x%.1f … x%.1f%s  (si distorsiona, baja el deslizador)"
+            .format(minX, maxX, advText)
+    }
+
+    private fun updateLabel(enabled: Boolean, db: Float) {
+        val x = dbToFactor(db)
+        val dbStr = if (db >= 0f) "+%.1f dB".format(db) else "%.1f dB".format(db)
+        tvFactor.text = if (enabled) "Ganancia: x%.2f (%s)".format(x, dbStr) else "Ganancia desactivada"
+    }
+
+    // ===== mapeos =====
+    private fun dbToFactor(db: Float) = 10f.pow(db / 20f)
+    private fun progressToDb(p: Int, maxDb: Float): Float {
+        val t = (p / 200f) // 0..1
+        return Prefs.BASIC_MIN_DB + t * (maxDb - Prefs.BASIC_MIN_DB)
+    }
+    private fun dbToProgress(db: Float, maxDb: Float): Int {
+        val t = (db - Prefs.BASIC_MIN_DB) / (maxDb - Prefs.BASIC_MIN_DB)
+        return (t * 200f).toInt().coerceIn(0, 200)
     }
 }

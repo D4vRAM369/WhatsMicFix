@@ -162,8 +162,9 @@ object AudioHooks {
         }
     }
 
-    /** 5) Pre‑boost PCM con clip‑guard en los overloads de read(...) */
+    /** 5) Pre‑boost con soft‑clipper en los overloads de read(...) */
     private fun hookAudioRecordReadOverloads() {
+        // short[]
         try {
             XposedHelpers.findAndHookMethod(
                 AudioRecord::class.java, "read",
@@ -175,13 +176,15 @@ object AudioHooks {
                             val buf = param.args[0] as ShortArray
                             val off = param.args[1] as Int
                             val size = min(ret, param.args[2] as Int)
-                            boostShortArray(buf, off, size, Prefs.boostFactor)
+                            val factor = Prefs.dbToFactor(Prefs.boostDb)
+                            boostShortArraySoft(buf, off, size, factor)
                         }
                     }
                 }
             )
         } catch (t: Throwable) { Logx.e("Hook read(short[]) falló", t) }
 
+        // byte[]
         try {
             XposedHelpers.findAndHookMethod(
                 AudioRecord::class.java, "read",
@@ -193,13 +196,15 @@ object AudioHooks {
                             val buf = param.args[0] as ByteArray
                             val off = param.args[1] as Int
                             val size = min(ret, param.args[2] as Int)
-                            boostByteArrayPCM16(buf, off, size, Prefs.boostFactor)
+                            val factor = Prefs.dbToFactor(Prefs.boostDb)
+                            boostByteArrayPCM16Soft(buf, off, size, factor)
                         }
                     }
                 }
             )
         } catch (t: Throwable) { Logx.e("Hook read(byte[]) falló", t) }
 
+        // ByteBuffer
         try {
             XposedHelpers.findAndHookMethod(
                 AudioRecord::class.java, "read",
@@ -209,7 +214,8 @@ object AudioHooks {
                         val ret = param.result as Int
                         if (ret > 0 && Prefs.enablePreboost) {
                             val bb = param.args[0] as ByteBuffer
-                            boostByteBufferPCM16(bb, ret, Prefs.boostFactor)
+                            val factor = Prefs.dbToFactor(Prefs.boostDb)
+                            boostByteBufferPCM16Soft(bb, ret, factor)
                         }
                     }
                 }
@@ -230,10 +236,7 @@ object AudioHooks {
         if (Build.VERSION.SDK_INT < 28) return
         try {
             // setPreferredDevice(AudioDeviceInfo) por reflexión
-            val setPref = AudioRecord::class.java.getMethod(
-                "setPreferredDevice",
-                AudioDeviceInfo::class.java
-            )
+            val setPref = AudioRecord::class.java.getMethod("setPreferredDevice", AudioDeviceInfo::class.java)
 
             // Obtener un Context del proceso actual (ActivityThread)
             val app = try {
@@ -243,7 +246,6 @@ object AudioHooks {
 
             val am = app?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             val inputs = am?.getDevices(AudioManager.GET_DEVICES_INPUTS) ?: emptyArray()
-
             val builtin = inputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
             if (builtin != null) {
                 setPref.invoke(rec, builtin)
@@ -256,41 +258,49 @@ object AudioHooks {
         }
     }
 
+    // === Soft clipper (tanh) ===
+    private const val FULL_SCALE = 32767.0
+    private fun softClip(v: Double): Short {
+        // drive ~0.85 suaviza antes de llegar a full scale
+        val y = tanh(v / FULL_SCALE * 0.85) * FULL_SCALE
+        val clamped = y.coerceIn(-32768.0, 32767.0)
+        return clamped.roundToInt().toShort()
+    }
 
-    private fun clamp16(v: Int): Short = max(-32768, min(32767, v)).toShort()
-
-    private fun boostShortArray(buf: ShortArray, off: Int, size: Int, factor: Float) {
+    private fun boostShortArraySoft(buf: ShortArray, off: Int, size: Int, factor: Float) {
+        val f = factor.toDouble()
         for (i in off until off + size) {
-            val v = (buf[i] * factor).roundToInt()
-            buf[i] = clamp16(v)
+            val v = buf[i].toInt()
+            buf[i] = softClip(v * f)
         }
     }
 
-    private fun boostByteArrayPCM16(bytes: ByteArray, off: Int, size: Int, factor: Float) {
+    private fun boostByteArrayPCM16Soft(bytes: ByteArray, off: Int, size: Int, factor: Float) {
         var i = off
         val end = off + size - 1
+        val f = factor.toDouble()
         while (i < end) {
             val lo = bytes[i].toInt() and 0xFF
             val hi = bytes[i + 1].toInt()
             val sample = (hi shl 8) or lo
-            val boosted = (sample * factor).roundToInt()
-            val clamped = clamp16(boosted).toInt()
-            bytes[i]     = (clamped and 0xFF).toByte()
-            bytes[i + 1] = ((clamped shr 8) and 0xFF).toByte()
+            val out = softClip(sample * f)
+            bytes[i]     = (out.toInt() and 0xFF).toByte()
+            bytes[i + 1] = ((out.toInt() shr 8) and 0xFF).toByte()
             i += 2
         }
     }
 
-    private fun boostByteBufferPCM16(bb: ByteBuffer, validBytes: Int, factor: Float) {
+    private fun boostByteBufferPCM16Soft(bb: ByteBuffer, validBytes: Int, factor: Float) {
         val order = bb.order()
         bb.order(ByteOrder.LITTLE_ENDIAN)
         val pos = bb.position()
         val lim = pos + validBytes
+        val f = factor.toDouble()
         var i = pos
         while (i + 1 < lim) {
-            val sample = bb.getShort(i)
-            val boosted = (sample * factor).roundToInt()
-            bb.putShort(i, clamp16(boosted))
+            val s = bb.getShort(i).toInt()
+            val out = softClip(s * f)
+            bb.putShort(i, out)
             i += 2
         }
         bb.order(order)

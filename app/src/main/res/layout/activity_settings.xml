@@ -7,7 +7,6 @@
     android:layout_height="match_parent"
     android:background="#111316">
 
-    <!-- Título -->
     <TextView
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
@@ -17,7 +16,6 @@
         android:textSize="20sp"
         android:textColor="#FFFFFF" />
 
-    <!-- Switch para activar/desactivar -->
     <Switch
         android:id="@+id/swEnable"
         android:layout_width="wrap_content"
@@ -26,25 +24,21 @@
         android:text="Activar pre-boost"
         android:textColor="#FFFFFF" />
 
-    <!-- Texto que muestra el factor actual -->
     <TextView
         android:id="@+id/tvFactor"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:text="Ganancia: x1.35 (+2.6 dB)"
+        android:text="Ganancia: x1.00 (+0.0 dB)"
         android:textColor="#B0BEC5" />
 
-    <!-- Barra para ajustar ganancia -->
     <SeekBar
         android:id="@+id/seekBoost"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:max="200"
-        android:progress="135" />
+        android:max="200" />
 
-    <!-- Texto con aviso sobre el rango -->
     <TextView
         android:id="@+id/tvRangeInfo"
         android:layout_width="wrap_content"
@@ -53,4 +47,19 @@
         android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
         android:textColor="#8FA3AD" />
 
+    <Switch
+        android:id="@+id/swAdvanced"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Rango avanzado (hasta 4×)"
+        android:textColor="#FFFFFF" />
+
+    <TextView
+        android:id="@+id/tvHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="El rango avanzado puede introducir distorsión. Úsalo con moderación."
+        android:textColor="#8FA3AD" />
 </LinearLayout>
