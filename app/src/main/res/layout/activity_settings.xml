@@ -1,65 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="20dp"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#111316">
 
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="WhatsMicFix"
-        android:textStyle="bold"
-        android:textSize="20sp"
-        android:textColor="#FFFFFF" />
-
-    <Switch
-        android:id="@+id/swEnable"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Activar pre-boost"
-        android:textColor="#FFFFFF" />
-
-    <TextView
-        android:id="@+id/tvFactor"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Ganancia: x1.00 (+0.0 dB)"
-        android:textColor="#B0BEC5" />
-
-    <SeekBar
-        android:id="@+id/seekBoost"
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="20dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:max="200" />
+        android:layout_height="wrap_content">
 
-    <TextView
-        android:id="@+id/tvRangeInfo"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
-        android:textColor="#8FA3AD" />
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WhatsMicFix 1.2-stable"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:textColor="#FFFFFF" />
 
-    <Switch
-        android:id="@+id/swAdvanced"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Rango avanzado (hasta 4×)"
-        android:textColor="#FFFFFF" />
+        <!-- Activar/desactivar pre-boost -->
+        <Switch
+            android:id="@+id/swEnable"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Activar pre-boost"
+            android:textColor="#FFFFFF" />
 
-    <TextView
-        android:id="@+id/tvHint"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="El rango avanzado puede introducir distorsión. Úsalo con moderación."
-        android:textColor="#8FA3AD" />
-</LinearLayout>
+        <TextView
+            android:id="@+id/tvFactor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Ganancia: x1.35 (+2.6 dB)"
+            android:textColor="#B0BEC5" />
+
+        <SeekBar
+            android:id="@+id/seekBoost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:max="250"
+            android:progress="135" />
+
+        <TextView
+            android:id="@+id/tvRangeInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
+            android:textColor="#8FA3AD" />
+
+        <!-- Opciones de estabilidad -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="Opciones de estabilidad"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+
+        <Switch
+            android:id="@+id/swRespectFmt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Respetar formato que pida la app (recomendado)"
+            android:textColor="#FFFFFF" />
+
+        <Switch
+            android:id="@+id/swForceMic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Forzar fuente = MIC (solo si el micro no cambia)"
+            android:textColor="#FFFFFF" />
+
+        <Switch
+            android:id="@+id/swAgc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Habilitar AGC"
+            android:textColor="#FFFFFF" />
+
+        <Switch
+            android:id="@+id/swNs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Habilitar supresor de ruido"
+            android:textColor="#FFFFFF" />
+
+    </LinearLayout>
+</ScrollView>

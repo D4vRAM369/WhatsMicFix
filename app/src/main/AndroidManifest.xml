@@ -3,7 +3,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="WhatsMicFix"
+        android:label="WhatsMicFix 1.2"
         android:icon="@android:drawable/ic_btn_speak_now"
         android:theme="@style/Theme.WhatsMicFix">
         <meta-data android:name="xposedmodule" android:value="true" />

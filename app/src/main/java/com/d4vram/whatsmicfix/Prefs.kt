@@ -6,7 +6,7 @@ import java.io.File
 import kotlin.math.pow
 
 object Prefs {
-    private const val PKG = "com.d4vram.whatsmicfix"
+    private const val PKG = "com.d4vram.whatsmicfix.v1.2"
     const val FILE = "whatsmicfix_prefs"
 
     const val KEY_ENABLE = "enable_preboost"
@@ -19,18 +19,27 @@ object Prefs {
     const val ADV_MAX_DB   = +12f  // ≈4×
 
     // Valores efectivos en el proceso hookeado
-    @Volatile var enablePreboost: Boolean = true;     private set
-    @Volatile var boostDb: Float = 6f;                private set
-    @Volatile var advanced: Boolean = false;          private set
+    @Volatile var enablePreboost: Boolean = true
+        private set
+    @Volatile var boostDb: Float = 6f
+        private set
+    @Volatile var advanced: Boolean = false
+        private set
 
     fun reload() {
         try {
             val xp = XSharedPreferences(PKG, FILE)
-            xp.makeWorldReadable(); xp.reload()
+            xp.makeWorldReadable()
+            xp.reload()
+
             enablePreboost = xp.getBoolean(KEY_ENABLE, true)
             val savedDb = xp.getFloat(KEY_DB, 6f)
             advanced = xp.getBoolean(KEY_ADV, false)
-            boostDb = savedDb.coerceIn(BASIC_MIN_DB, if (advanced) ADV_MAX_DB else BASIC_MAX_DB)
+            boostDb = savedDb.coerceIn(
+                BASIC_MIN_DB,
+                if (advanced) ADV_MAX_DB else BASIC_MAX_DB
+            )
+
             Logx.d("Prefs reloaded: enable=$enablePreboost db=$boostDb adv=$advanced")
         } catch (t: Throwable) {
             Logx.e("Prefs reload error", t)
@@ -40,7 +49,7 @@ object Prefs {
     /** dB → factor lineal */
     fun dbToFactor(db: Float): Float = 10f.pow(db / 20f)
 
-    /** Compat para UI antigua que guardaba factor */
+    /** Guardado desde la UI */
     fun saveFromUi(ctx: Context, enable: Boolean, db: Float, adv: Boolean) {
         val maxDb = if (adv) ADV_MAX_DB else BASIC_MAX_DB
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
