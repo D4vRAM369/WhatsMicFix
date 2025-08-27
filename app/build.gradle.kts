@@ -12,7 +12,7 @@ android {
         minSdk = 24
         targetSdk = 35
         versionCode = 120
-        versionName = "1.2.0"
+        versionName = "1.2"
     }
 
     buildTypes {
@@ -26,9 +26,9 @@ android {
         getByName("debug") {
             isMinifyEnabled = false
 
-            // --- instalar en paralelo sin sobrescribir la 1.0 ---
-            applicationIdSuffix = ".v11"   // com.d4vram.whatsmicfix.v11
-            versionNameSuffix = "-v1.1"    // verás ...-v1.1 en Info de la app
+            // --- Comentado para permitir actualización de la v1.0 ---
+            // applicationIdSuffix = ".v11"   // com.d4vram.whatsmicfix.v11
+            // versionNameSuffix = "-v1.1"    // Comentado para mostrar solo versión 1.2
             // Si tu Manifest usa @string/app_name, puedes diferenciar el nombre visible:
             // resValue("string", "app_name", "WhatsMicFix v1.1")
         }
