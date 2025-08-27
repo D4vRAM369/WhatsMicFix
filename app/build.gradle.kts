@@ -1,3 +1,10 @@
+import java.util.Properties
+
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 plugins {
     id("com.android.application")
     kotlin("android")
@@ -5,27 +12,44 @@ plugins {
 
 android {
     namespace = "com.d4vram.whatsmicfix"
-    // Si ya tienes Android 16 SDK instalado, puedes subir a 36 cuando esté estable.
     compileSdk = 35
 
     defaultConfig {
         applicationId = "com.d4vram.whatsmicfix"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 120
+        versionName = "1.2"
+    }
+
+    signingConfigs {
+        create("release") {
+            keystoreProps["storeFile"]?.let { storeFile = file(it as String) }
+            storePassword = keystoreProps["storePassword"] as String?
+            keyAlias = keystoreProps["keyAlias"] as String?
+            keyPassword = keystoreProps["keyPassword"] as String?
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
     }
 
     buildTypes {
-        release {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
         }
-        debug {
+        getByName("debug") {
             isMinifyEnabled = false
+            // Comentado para permitir actualización sobre la 1.0
+            // applicationIdSuffix = ".v11"
+            // versionNameSuffix = "-v1.1"
+            // resValue("string", "app_name", "WhatsMicFix v1.1")
         }
     }
 
@@ -47,7 +71,7 @@ android {
 }
 
 dependencies {
-    // Xposed/LSPosed API (desde api.xposed.info, sin JitPack)
+    // Xposed/LSPosed API
     compileOnly("de.robv.android.xposed:api:82")
     compileOnly("de.robv.android.xposed:api:82:sources")
 
