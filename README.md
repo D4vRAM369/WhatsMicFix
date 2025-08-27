@@ -35,7 +35,7 @@ Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales
 
 ---
 
-**📌 Notas técnicas**
+## 📌 Notas técnicas
 
 WhatsMicFix está desarrollado siguiendo un enfoque **Project-Based Learning** **(PBL)**.
 
