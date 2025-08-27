@@ -21,8 +21,11 @@ Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales
    - Pre-boost opcional  
    - AGC y supresión de ruido  
    - Forzado de micrófono interno  
-3. Ve a **Ajustes del sistema → Apps → WhatsApp → Forzar detención**.  
-4. Abre WhatsApp y graba un audio para probar los cambios.
+3. **Forzar detención de WhatsApp y volver a abrirlo.**
+
+Al forzar la detención se cierra por completo el proceso de WhatsApp. Al abrirlo de nuevo, LSPosed vuelve a cargar el módulo: se leen las preferencias guardadas y se registran los hooks (**`HookEntry.kt`** → **`AudioHooks`**.kt) con la configuración actual de **`Prefs.kt`**.
+Si solo cierras WhatsApp desde **Recientes**, el proceso suele quedar vivo y los cambios no se aplican.
+Después de abrirlo otra vez, **espera 5 segundos antes de grabar el primer audio** para que WhatsApp inicialice AudioRecord y los hooks actúen correctamente. Desde ese momento, los nuevos parámetros (ganancia, pre-boost, AGC, supresión de ruido, etc.) estarán activos en la grabación.
 
 > **Nota:** Forzar detención reinicia `AudioRecord` con los nuevos parámetros aplicados por el módulo.
 
