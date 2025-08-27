@@ -35,10 +35,6 @@ Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales
 
 ---
 
-## ⚙️ Compilación
-```bash
-./gradlew clean assembleRelease
-
 **📌 Notas técnicas**
 
 WhatsMicFix está desarrollado siguiendo un enfoque **Project-Based Learning** **(PBL)**.
@@ -50,3 +46,8 @@ La persistencia de los hooks depende del comportamiento interno de WhatsApp: en 
 El objetivo futuro es mejorar la estabilidad y reducir la dependencia del comportamiento interno de WhatsApp.
 
 Se agradecen contribuciones o ideas para seguir optimizando el módulo.
+
+
+## ⚙️ Compilación
+```bash
+./gradlew clean assembleRelease```
