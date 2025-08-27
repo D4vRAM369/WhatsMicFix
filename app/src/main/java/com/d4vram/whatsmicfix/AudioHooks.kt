@@ -30,6 +30,7 @@ object AudioHooks {
     }
 
     // === 1) Constructor clásico: AudioRecord(int,int,int,int,int) ===
+    @Suppress("UNUSED_PARAMETER")
     private fun hookAudioRecordConstructors(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
             XposedHelpers.findAndHookConstructor(
@@ -111,14 +112,21 @@ object AudioHooks {
                         } else {
                             // Respetar: sólo asegurar SR válido
                             val sr = if (fmtIn.sampleRate <= 0) SR_FALLBACK else fmtIn.sampleRate
-                            if (sr != fmtIn.sampleRate) {
+                            // Validate encoding to avoid ENCODING_INVALID
+                            val encoding = if (fmtIn.encoding == AudioFormat.ENCODING_INVALID) {
+                                AudioFormat.ENCODING_PCM_16BIT
+                            } else {
+                                fmtIn.encoding
+                            }
+                            
+                            if (sr != fmtIn.sampleRate || encoding != fmtIn.encoding) {
                                 val newFmt = AudioFormat.Builder()
                                     .setSampleRate(sr)
                                     .setChannelMask(fmtIn.channelMask)
-                                    .setEncoding(fmtIn.encoding)
+                                    .setEncoding(encoding)
                                     .build()
                                 p.args[0] = newFmt
-                                Logx.d("Builder.setAudioFormat: SR ajustado a $sr (resto respetado)")
+                                Logx.d("Builder.setAudioFormat: SR ajustado a $sr y/o encoding validado (resto respetado)")
                             } else {
                                 Logx.d("Builder.setAudioFormat: respetado")
                             }

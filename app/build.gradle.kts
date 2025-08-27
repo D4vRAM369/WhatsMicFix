@@ -26,7 +26,7 @@ android {
         getByName("debug") {
             isMinifyEnabled = false
 
-            // --- Comentado para permitir actualización de la v1.0 ---
+            // --- Comentado para permitir actualización de la v1.0 en lugar de instalarse como otra versión aparte ---
             // applicationIdSuffix = ".v11"   // com.d4vram.whatsmicfix.v11
             // versionNameSuffix = "-v1.1"    // Comentado para mostrar solo versión 1.2
             // Si tu Manifest usa @string/app_name, puedes diferenciar el nombre visible:
