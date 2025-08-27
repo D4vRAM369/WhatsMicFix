@@ -1,5 +1,8 @@
 # WhatsMicFix (LSPosed Module)
 
+<img width="512" height="512" alt="WhatsMicFix_1 2" src="https://github.com/user-attachments/assets/2394432f-e0d2-456e-8edd-fbe5f5cbe2e1" />
+
+
 Mejora la **calidad y el nivel** del audio enviado por WhatsApp cuando el micrófono queda por debajo de lo esperado. Incluye un **pre-boost x2.00 (+6.0 dB)** opcional.
 
 ## Estado
