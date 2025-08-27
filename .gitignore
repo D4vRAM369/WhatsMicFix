@@ -35,3 +35,4 @@ fastlane/screenshots/
 .DS_Store
 Thumbs.db
 
+keystore.properties

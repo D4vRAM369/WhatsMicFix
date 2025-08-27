@@ -1,3 +1,10 @@
+import java.util.Properties
+
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 plugins {
     id("com.android.application")
     kotlin("android")
@@ -15,9 +22,23 @@ android {
         versionName = "1.2"
     }
 
+    signingConfigs {
+        create("release") {
+            keystoreProps["storeFile"]?.let { storeFile = file(it as String) }
+            storePassword = keystoreProps["storePassword"] as String?
+            keyAlias = keystoreProps["keyAlias"] as String?
+            keyPassword = keystoreProps["keyPassword"] as String?
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -25,11 +46,9 @@ android {
         }
         getByName("debug") {
             isMinifyEnabled = false
-
-            // --- Comentado para permitir actualización de la v1.0 en lugar de instalarse como otra versión aparte ---
-            // applicationIdSuffix = ".v11"   // com.d4vram.whatsmicfix.v11
-            // versionNameSuffix = "-v1.1"    // Comentado para mostrar solo versión 1.2
-            // Si tu Manifest usa @string/app_name, puedes diferenciar el nombre visible:
+            // Comentado para permitir actualización sobre la 1.0
+            // applicationIdSuffix = ".v11"
+            // versionNameSuffix = "-v1.1"
             // resValue("string", "app_name", "WhatsMicFix v1.1")
         }
     }
