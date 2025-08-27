@@ -50,4 +50,4 @@ Se agradecen contribuciones o ideas para seguir optimizando el módulo.
 
 ## ⚙️ Compilación
 ```bash
-./gradlew clean assembleRelease```
+./gradlew clean assembleRelease
