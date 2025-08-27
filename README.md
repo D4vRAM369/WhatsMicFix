@@ -25,9 +25,9 @@ Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales
 
 Al forzar la detención se cierra por completo el proceso de WhatsApp. Al abrirlo de nuevo, LSPosed vuelve a cargar el módulo: se leen las preferencias guardadas y se registran los hooks (**`HookEntry.kt`** → **`AudioHooks.kt`**) con la configuración actual de **`Prefs.kt`**.
 Si solo cierras WhatsApp desde **Recientes**, el proceso suele quedar vivo y los cambios no se aplican.
-Después de abrirlo otra vez, **espera 5 segundos antes de grabar el primer audio** para que WhatsApp inicialice AudioRecord y los hooks actúen correctamente. Desde ese momento, los nuevos parámetros (ganancia, pre-boost, AGC, supresión de ruido, etc.) estarán activos en la grabación.
+Después de abrirlo otra vez, **espera 5 segundos antes de grabar el primer audio** para que WhatsApp inicialice **`AudioRecord`** y los hooks actúen correctamente. Desde ese momento, los nuevos parámetros (ganancia, pre-boost, AGC, supresión de ruido, etc.) estarán activos en la grabación.
 
-> **Nota:** Forzar detención reinicia **`AudioRecord`** con los nuevos parámetros aplicados por el módulo.
+> **Nota:** Forzar detención reinicia `AudioRecord` con los nuevos parámetros aplicados por el módulo.
 
 ---
 
