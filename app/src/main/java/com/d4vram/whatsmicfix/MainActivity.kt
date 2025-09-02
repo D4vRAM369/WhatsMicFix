@@ -213,6 +213,16 @@ class MainActivity : AppCompatActivity() {
         }
         sendToWa("com.d4vram.whatsmicfix.PING")
     }
+<<<<<<< HEAD
+=======
+    sendToWa("com.d4vram.whatsmicfix.PING")
+    
+    // Mini-heartbeat para desatascar el estado
+    for (i in 1..9) {
+        handler.postDelayed({ sendToWa("com.d4vram.whatsmicfix.PING") }, 1000L * i)
+    }
+}
+>>>>>>> temp-commits
 
     override fun onPause() {
         super.onPause()

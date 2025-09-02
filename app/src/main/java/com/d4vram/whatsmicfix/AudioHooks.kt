@@ -42,11 +42,10 @@ object AudioHooks {
     @Volatile private var lastActive = false
     @Volatile private var lastReason = "init"
     @Volatile private var lastTs = 0L
-    @Volatile private var globalBoostFactor = 4.0f // 4x = 12dB boost inicial
+    @Volatile private var globalBoostFactor = 4.0f // 4x = 12 dB (default)
 
-    @Volatile private var lastPreBoostTs = 0L
-
-    @Volatile private var lastPreboostValue = 1.0f
+    @Volatile private var lastPreboostTs: Long = 0L
+    @Volatile private var lastPreboostBoost: Float = 1.0f
 
     private var totalAudioRecordsHooked = 0
     private var totalPreBoostsApplied = 0
@@ -78,18 +77,23 @@ object AudioHooks {
     }
 
     private fun updateGlobalBoostFactor() {
-        try {
-            Prefs.reloadIfStale(100)
-            globalBoostFactor = if (Prefs.moduleEnabled && Prefs.enablePreboost) {
-                // Permitir hasta 4x (12dB) con el nuevo sistema de compresión
-                min(maxOf(Prefs.boostFactor, 1.0f), 4.0f)
-            } else {
-                1.0f
+        synchronized(this) {
+            try {
+                Prefs.reloadIfStale(2000)
+                val newFactor = if (Prefs.moduleEnabled && Prefs.enablePreboost) {
+                    min(maxOf(Prefs.boostFactor, 1.0f), 4.0f)
+                } else {
+                    1.0f
+                }
+                
+                // Solo actualizar si hay cambio significativo
+                if (kotlin.math.abs(globalBoostFactor - newFactor) > 0.05f) {
+                    globalBoostFactor = newFactor
+                    Logx.d("Boost factor actualizado: ${globalBoostFactor}x")
+                }
+            } catch (t: Throwable) {
+                Logx.w("Prefs no disponibles, conservo boost actual=${globalBoostFactor}x")
             }
-            Logx.d("Boost factor actualizado: ${globalBoostFactor}x")
-        } catch (t: Throwable) {
-            globalBoostFactor = 4.0f // Default agresivo como pediste
-            Logx.w("Error leyendo prefs, usando boost default: ${globalBoostFactor}x")
         }
     }
 
@@ -112,27 +116,25 @@ object AudioHooks {
         lastTs = System.currentTimeMillis()
 
         try {
-            val ctx = AppCtx.get()
-            if (ctx != null) {
-                ctx.sendBroadcast(
-                    Intent("com.d4vram.whatsmicfix.WFM_STATUS")
-                        .setPackage(APP_PKG)
-                        .putExtra("active", active)
-                        .putExtra("reason", reason)
-                        .putExtra("sid", sid)
-                        .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
-                        .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
-                        .putExtra("ts", lastTs)
-                        .putExtra("boostFactor", globalBoostFactor)
-                        // 👇 NUEVO: cache “preboost reciente”
-                        .putExtra("recentPreboostAgeMs",)
-                            if (lastPreboostTs == 0L) Long.MAX_VALUE else System.currentTimeMillis() - lastPreboostTs
-                        )
-                        .putExtra("recentPreboostBoost", lastPreboostBoost)
-                )
-            }
-        } catch (t: Throwable) {
-            Logx.w("Error en emitStatus: ${t.message}")
+            AppCtx.get()?.sendBroadcast(
+                Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                    .setPackage(APP_PKG)
+                    .putExtra("active", active)
+                    .putExtra("reason", reason)
+                    .putExtra("sid", sid)
+                    .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
+                    .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
+                    .putExtra("ts", lastTs)
+                    .putExtra("boostFactor", globalBoostFactor)
+                    .putExtra(
+                        "recentPreboostAgeMs",
+                        if (lastPreboostTs == 0L) Long.MAX_VALUE
+                        else System.currentTimeMillis() - lastPreboostTs
+                    )
+                    .putExtra("recentPreboostBoost", lastPreboostBoost)
+            )
+        } catch (_: Throwable) {
+            // no-op
         }
     }
 
@@ -146,25 +148,18 @@ object AudioHooks {
                     .putExtra("reason", lastReason)
                     .putExtra("ts", lastTs)
                     .putExtra("boostFactor", globalBoostFactor)
-                    // 👇 NUEVO: cache “preboost reciente”
-                    .putExtra(
-                        "recentPreboostAgeMs",
-                        if (lastPreboostTs == 0L) Long.MAX_VALUE
-                        else System.currentTimeMillis() - lastPreboostTs
-                    )
-                    .putExtra("recentPreboostFactor", lastPreboostBoost)
-                    // 👇 NUEVO: estadísticas acumuladas
                     .putExtra("totalHooked", totalAudioRecordsHooked)
                     .putExtra("totalBoosts", totalPreBoostsApplied)
-                    // 👇 NUEVO: incluir también en el PING
                     .putExtra(
                         "recentPreboostAgeMs",
                         if (lastPreboostTs == 0L) Long.MAX_VALUE
                         else System.currentTimeMillis() - lastPreboostTs
                     )
-                    .putExtra("recentPreboostFactor", lastPreboostBoost
+                    .putExtra("recentPreboostBoost", lastPreboostBoost)
             )
-        } catch (_: Throwable) {}
+        } catch (_: Throwable) {
+            // no-op
+        }
     }
 
     private fun hookAudioRecordCtor() {
@@ -257,6 +252,11 @@ object AudioHooks {
     }
 
     private fun initCompressorForRecord(ar: AudioRecord, sampleRate: Int) {
+        // Verificar que no exista ya un estado
+        if (compressorStates.containsKey(ar)) {
+            return // Evitar reinitialización
+        }
+        
         val attackSamples = (ATTACK_TIME * sampleRate).toInt()
         val releaseSamples = (RELEASE_TIME * sampleRate).toInt()
 
@@ -357,12 +357,18 @@ object AudioHooks {
     private fun hookStartRecording() {
         XposedHelpers.findAndHookMethod(AudioRecord::class.java, "startRecording", object : XC_MethodHook() {
             override fun afterHookedMethod(p: MethodHookParam) {
-                Prefs.reloadIfStale(500)
+                updateGlobalBoostFactor()
                 if (!Prefs.moduleEnabled) return
 
                 val ar = p.thisObject as AudioRecord
                 val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                 if (sid <= 0) return
+
+                // Verificar que el compresor esté inicializado
+                if (!compressorStates.containsKey(ar)) {
+                    val sr = try { ar.sampleRate } catch (_: Throwable) { SR_FALLBACK }
+                    initCompressorForRecord(ar, sr)
+                }
 
                 if (!fxBySession.containsKey(sid)) {
                     val agc = if (Prefs.enableAgc && AutomaticGainControl.isAvailable()) {
@@ -419,8 +425,7 @@ object AudioHooks {
                     if (count <= 0) return
 
                     val ar = p.thisObject as AudioRecord
-
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
                     val buf = p.args[0] as ShortArray
                     val off = p.args[1] as Int
@@ -451,8 +456,7 @@ object AudioHooks {
                     if (count <= 0) return
 
                     val ar = p.thisObject as AudioRecord
-
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
                     val buf = p.args[0] as ByteArray
                     val off = p.args[1] as Int
@@ -482,8 +486,7 @@ object AudioHooks {
                         if (count <= 0) return
 
                         val ar = p.thisObject as AudioRecord
-
-                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
                         val bb = p.args[0] as ByteBuffer
                         val valid = min(count, bb.remaining())
