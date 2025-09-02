@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposed_scope">
+        <!-- CRÍTICO: System Framework (MÁS IMPORTANTE) -->
+        <item>android</item>
+        <item>system</item>
+        
+        <!-- WhatsApp (objetivo principal) -->
+        <item>com.whatsapp</item>
+        <item>com.whatsapp.w4b</item>
+        
+        <!-- Servicios de audio del sistema -->
+        <item>com.android.server.audio</item>
+        <item>media.audio</item>
+        <item>audioserver</item>
+        
+        <!-- Apps de comunicación populares -->
+        <item>org.telegram.messenger</item>
+        <item>com.facebook.orca</item>
+        <item>com.discord</item>
+        <item>us.zoom.videomeetings</item>
+        <item>com.skype.raider</item>
+        
+        <!-- Grabadoras de audio -->
+        <item>com.google.android.apps.recorder</item>
+        <item>com.samsung.android.app.memo</item>
+        <item>com.sec.android.app.voicenote</item>
+        <item>com.android.soundrecorder</item>
+    </string-array>
+</resources>

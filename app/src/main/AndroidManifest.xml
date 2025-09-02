@@ -10,8 +10,9 @@
         <!-- Requisitos de LSPosed/Xposed -->
         <meta-data android:name="xposedmodule" android:value="true" />
         <meta-data android:name="xposeddescription"
-            android:value="Fuerza perfil de micro correcto en WhatsApp y habilita AGC/NS para arreglar audios bajos (A14–A16)." />
+            android:value="WhatsMicFix v1.3 - Boost universal de audio para todo el sistema Android. Aplicar a: System Framework, WhatsApp, apps de audio y servicios del sistema." />
         <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
 
         <!-- Pantalla de ajustes -->
         <activity

@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 import kotlin.math.log10
@@ -33,19 +34,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var btnCheck: Button
 
-    // Último estado que envía el hook
     private var lastActive = false
     private var lastReason = "init"
     private var lastTs = 0L
 
-    // Sistema de confirmación mejorado
     private val handler = Handler(Looper.getMainLooper())
-    private var audioDetectionStartTime = 0L
-    private var hasRecentAudio = false
-    private var confirmationTimeout: Runnable? = null
+    private var checkStartTime = 0L
     private var isCheckingFunctionality = false
+    private var checkTimeout: Runnable? = null
 
-    // Recibe WFM_STATUS/DIAG_EVENT desde el hook
+    // Para detectar distorsión
+    private var lastBoostValue = 1.0f
+    private var distortionWarningShown = false
+
     private val statusRx = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -53,10 +54,16 @@ class MainActivity : AppCompatActivity() {
                     lastActive = intent.getBooleanExtra("active", false)
                     lastReason = intent.getStringExtra("reason") ?: ""
                     lastTs     = intent.getLongExtra("ts", 0L)
-                    
-                    // Detectar actividad de audio para confirmación
-                    if (lastReason == "preboost" && isCheckingFunctionality) {
-                        detectAudioActivity()
+
+                    val boostFactor = intent.getFloatExtra("boostFactor", 0f)
+                    val totalBoosts = intent.getIntExtra("totalBoosts", 0)
+
+                    if (isCheckingFunctionality && lastReason == "preboost") {
+                        showCheckResult(true, "Audio detectado y procesado correctamente (${String.format("%.1f", boostFactor)}x)")
+                    }
+
+                    if (boostFactor > 0f && totalBoosts > 0) {
+                        statusText.text = "Boost activo: ${String.format("%.1f", boostFactor)}x (${totalBoosts} procesados)"
                     }
                     
                     applyStatusWithTtl()
@@ -64,7 +71,7 @@ class MainActivity : AppCompatActivity() {
                 "com.d4vram.whatsmicfix.DIAG_EVENT" -> {
                     val msg = intent.getStringExtra("msg") ?: return
                     if (msg.startsWith("Hook activo en")) {
-                        statusText.text = "Hook cargado en WhatsApp"
+                        statusText.text = "Hook cargado en WhatsApp ✓"
                     }
                 }
             }
@@ -73,7 +80,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendToWa(action: String) {
         val pkgs = arrayOf("com.whatsapp", "com.whatsapp.w4b")
-        for (p in pkgs) try { sendBroadcast(Intent(action).setPackage(p)) } catch (_: Throwable) {}
+        for (p in pkgs) {
+            try {
+                sendBroadcast(Intent(action).setPackage(p))
+            } catch (_: Throwable) {}
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,7 +92,25 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
 
         Prefs.reloadIfStale(this)
+        
+        // Valores iniciales con 8dB como pediste
+        if (Prefs.boostDb <= 0f || Prefs.boostDb > 12f) {
+            Prefs.saveFromUi(this, true, 8.0f, false) // +8dB por defecto
+            Prefs.saveAdvancedToggles(this, preboost = true)
+            makePrefsWorldReadable()
+            Prefs.reloadIfStale(this)
+        }
 
+        initializeViews()
+        setupListeners()
+        loadCurrentSettings()
+        makePrefsWorldReadable()
+
+        // Verificar estado inicial
+        sendToWa("com.d4vram.whatsmicfix.PING")
+    }
+
+    private fun initializeViews() {
         swEnable     = findViewById(R.id.swEnable)
         tvFactor     = findViewById(R.id.tvFactor)
         seekBoost    = findViewById(R.id.seekBoost)
@@ -92,50 +121,72 @@ class MainActivity : AppCompatActivity() {
         statusDot    = findViewById(R.id.statusDot)
         statusText   = findViewById(R.id.statusText)
         btnCheck     = findViewById(R.id.btnCheck)
+    }
 
+    private fun setupListeners() {
         btnCheck.setOnClickListener { startFunctionalityCheck() }
 
-        // Seek: 0.5x..2.5x  => 50..250
-        seekBoost.max = 250
+        // Rango ampliado: 0.5x..4.0x => 50..400 para soportar hasta 12dB
+        seekBoost.max = 400
         if (Build.VERSION.SDK_INT >= 26) seekBoost.min = 50
 
-        val enabled = Prefs.enablePreboost
-        val factor  = dbToLinear(Prefs.boostDb).coerceIn(0.5f, 2.5f)
+        swEnable.setOnCheckedChangeListener { _, isChecked ->
+            saveAll(isChecked, progressToFactor(seekBoost.progress))
+            if (!isChecked) {
+                statusText.text = "Módulo desactivado"
+            }
+        }
+
+        seekBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
+                val factor = progressToFactor(p)
+
+                if (fromUser) {
+                    // Advertencia si el boost es muy alto
+                    if (factor > 3.0f && !distortionWarningShown) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "⚠️ Boost muy alto - El compresor dinámico evitará distorsión",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        distortionWarningShown = true
+                    }
+                    saveAll(swEnable.isChecked, factor)
+                } else {
+                    updateLabel(swEnable.isChecked, factor)
+                }
+
+                lastBoostValue = factor
+            }
+
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {
+                distortionWarningShown = false
+            }
+        })
+
+        val toggleListener = { _: Any, _: Boolean ->
+            saveAll(swEnable.isChecked, progressToFactor(seekBoost.progress))
+        }
+
+        swForceMic.setOnCheckedChangeListener(toggleListener)
+        swAgc.setOnCheckedChangeListener(toggleListener)
+        swNs.setOnCheckedChangeListener(toggleListener)
+        swRespectFmt.setOnCheckedChangeListener(toggleListener)
+    }
+
+    private fun loadCurrentSettings() {
+        val enabled = Prefs.moduleEnabled
+        val factor  = dbToLinear(Prefs.boostDb).coerceIn(0.5f, 4.0f)
 
         swEnable.isChecked     = enabled
-        seekBoost.progress     = (factor * 100).toInt().coerceIn(50, 250)
+        seekBoost.progress     = (factor * 100).toInt().coerceIn(50, 400)
         swForceMic.isChecked   = Prefs.forceSourceMic
         swAgc.isChecked        = Prefs.enableAgc
         swNs.isChecked         = Prefs.enableNs
         swRespectFmt.isChecked = Prefs.respectAppFormat
 
         updateLabel(enabled, factor)
-
-        swEnable.setOnCheckedChangeListener { _, isChecked ->
-            saveAll(isChecked, progressToFactor(seekBoost.progress))
-        }
-
-        seekBoost.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
-                if (fromUser) saveAll(swEnable.isChecked, progressToFactor(p))
-                else          updateLabel(swEnable.isChecked, progressToFactor(p))
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        val toggleListener = { _: Any, _: Boolean ->
-            saveAll(swEnable.isChecked, progressToFactor(seekBoost.progress))
-        }
-        swForceMic.setOnCheckedChangeListener(toggleListener)
-        swAgc.setOnCheckedChangeListener(toggleListener)
-        swNs.setOnCheckedChangeListener(toggleListener)
-        swRespectFmt.setOnCheckedChangeListener(toggleListener)
-
-        makePrefsWorldReadable()
-
-        // Pide estado + canario
-        sendToWa("com.d4vram.whatsmicfix.PING")
     }
 
     override fun onResume() {
@@ -156,14 +207,26 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         try { unregisterReceiver(statusRx) } catch (_: Throwable) {}
+
+        if (isCheckingFunctionality) {
+            isCheckingFunctionality = false
+            checkTimeout?.let { handler.removeCallbacks(it) }
+            checkTimeout = null
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        checkTimeout?.let { handler.removeCallbacks(it) }
+        handler.removeCallbacksAndMessages(null)
     }
 
-    private fun progressToFactor(p: Int) = p.coerceIn(50, 250) / 100f
+    private fun progressToFactor(p: Int) = p.coerceIn(50, 400) / 100f
     private fun factorToDb(f: Float): Float = (20f * log10(f.toDouble())).toFloat()
     private fun dbToLinear(db: Float): Float = 10.0f.pow(db / 20f)
 
     private fun saveAll(enabled: Boolean, factor: Float) {
-        val db  = factorToDb(factor)
+        val db  = factorToDb(factor).coerceIn(-6f, 12f)
         val adv = swForceMic.isChecked || !swRespectFmt.isChecked || !swAgc.isChecked || !swNs.isChecked
 
         Prefs.saveFromUi(this, enabled, db, adv)
@@ -177,133 +240,149 @@ class MainActivity : AppCompatActivity() {
         )
 
         makePrefsWorldReadable()
+
+        // Enviar notificación de cambios
         sendToWa("com.d4vram.whatsmicfix.RELOAD")
-        sendToWa("com.d4vram.whatsmicfix.PING")
+
+        // Pequeño delay antes de pedir estado actualizado
+        handler.postDelayed({
+            sendToWa("com.d4vram.whatsmicfix.PING")
+        }, 100)
+
         updateLabel(enabled, factor)
     }
 
     private fun makePrefsWorldReadable() {
         try {
-            File(applicationInfo.dataDir + "/shared_prefs/${Prefs.FILE}.xml").setReadable(true, false)
+            // Múltiples intentos con diferentes rutas
+            val paths = listOf(
+                File(applicationInfo.dataDir + "/shared_prefs/${Prefs.FILE}.xml"),
+                File("/data/data/$packageName/shared_prefs/${Prefs.FILE}.xml")
+            )
+
+            paths.forEach { file ->
+                if (file.exists()) {
+                    file.setReadable(true, false)
+                    // También el directorio
+                    file.parentFile?.apply {
+                        setReadable(true, false)
+                        setExecutable(true, false)
+                    }
+                }
+            }
+
             Prefs.makePrefsWorldReadable(this)
-        } catch (_: Throwable) {}
+        } catch (t: Throwable) {
+            // Log silencioso, no mostrar al usuario
+        }
     }
 
     private fun updateLabel(enabled: Boolean, factor: Float) {
         val db = 20 * log10(factor.toDouble())
         val dbStr = if (db >= 0) "+%.1f dB".format(db) else "%.1f dB".format(db)
-        tvFactor.text = if (enabled) "Ganancia: x%.2f ($dbStr)".format(factor) else "Ganancia desactivada"
+
+        tvFactor.text = if (enabled) {
+            "Ganancia: x%.2f ($dbStr)".format(factor)
+        } else {
+            "Ganancia desactivada"
+        }
+
+        // Cambiar color según el nivel
+        val color = when {
+            !enabled -> android.graphics.Color.GRAY
+            factor > 3.0f -> 0xFFFF5722.toInt() // Naranja fuerte para boost muy alto
+            factor > 2.0f -> 0xFFFF9800.toInt() // Naranja para boost alto
+            else -> android.graphics.Color.WHITE
+        }
+        tvFactor.setTextColor(color)
     }
 
-    /** TTL extendido a 8s para mayor estabilidad */
     private fun applyStatusWithTtl() {
         val ageMs = System.currentTimeMillis() - lastTs
         val effectiveActive = if (lastActive) true else (lastReason == "preboost" && ageMs in 0..8000)
 
-        val color = if (effectiveActive) 0xFF2ECC71.toInt() else 0xFFE74C3C.toInt()
+        val color = when {
+            effectiveActive -> 0xFF2ECC71.toInt() // Verde
+            ageMs > 10000 -> 0xFFBDC3C7.toInt()   // Gris (sin datos recientes)
+            else -> 0xFFE74C3C.toInt()            // Rojo
+        }
+
         val bg = statusDot.background
         if (bg is GradientDrawable) bg.setColor(color) else bg.setTint(color)
 
-        val freshness = if (ageMs < 5000) "" else " (desfasado)"
+        val freshness = when {
+            ageMs < 2000 -> " (en vivo)"
+            ageMs < 5000 -> ""
+            ageMs < 10000 -> " (hace ${ageMs/1000}s)"
+            else -> " (sin señal)"
+        }
+
         statusText.text = when {
-            lastReason == "preboost" && !lastActive && effectiveActive ->
-                "Pre-boost reciente (≤8s)$freshness"
-            lastActive ->
+            lastReason == "preboost" && effectiveActive ->
                 "Pre-boost activo$freshness"
+            lastActive ->
+                "Procesando audio$freshness"
+            lastReason == "release" ->
+                "En espera$freshness"
             else ->
-                "Sin pre-boost$freshness${if (lastReason.isNotEmpty()) " · $lastReason" else ""}"
+                "Sin actividad$freshness"
         }
     }
 
     private fun startFunctionalityCheck() {
         isCheckingFunctionality = true
-        hasRecentAudio = false
-        audioDetectionStartTime = System.currentTimeMillis()
-        
-        // Cambiar estilo del botón durante la comprobación
-        btnCheck.text = "ENVÍA UN AUDIO EN WHATSAPP"
+        checkStartTime = System.currentTimeMillis()
+
+        btnCheck.text = "ENVÍA UN AUDIO EN WHATSAPP AHORA"
         if (Build.VERSION.SDK_INT >= 21) {
-            btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFFF9800.toInt()) // Naranja
+            btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFFF9800.toInt())
         }
         btnCheck.isEnabled = false
         
         statusText.text = "Esperando audio de WhatsApp..."
         val bg = statusDot.background
-        if (bg is GradientDrawable) bg.setColor(0xFFFF9800.toInt()) else bg.setTint(0xFFFF9800.toInt()) // Naranja
-        
-        // Enviar ping inicial
+        if (bg is GradientDrawable) bg.setColor(0xFFFF9800.toInt()) else bg.setTint(0xFFFF9800.toInt())
+
         sendToWa("com.d4vram.whatsmicfix.PING")
-        
-        // Timeout de 30 segundos para la comprobación
-        confirmationTimeout = Runnable {
+
+        checkTimeout = Runnable {
             if (isCheckingFunctionality) {
-                showCheckResult(false, "Tiempo agotado sin detectar audio")
+                showCheckResult(false, "No se detectó actividad de audio")
             }
         }
-        handler.postDelayed(confirmationTimeout!!, 30000)
-    }
-    
-    private fun detectAudioActivity() {
-        if (!isCheckingFunctionality) return
-        
-        if (!hasRecentAudio) {
-            hasRecentAudio = true
-            statusText.text = "Audio detectado! Esperando confirmación..."
-            
-            // Esperar 5-10 segundos después de la última actividad
-            handler.removeCallbacks(confirmationTimeout ?: return)
-            confirmationTimeout = Runnable {
-                if (isCheckingFunctionality && hasRecentAudio) {
-                    val timeSinceLastAudio = System.currentTimeMillis() - lastTs
-                    if (timeSinceLastAudio >= 5000) { // 5 segundos de espera
-                        checkFinalResult()
-                    } else {
-                        // Esperar un poco más
-                        handler.postDelayed(confirmationTimeout!!, 2000)
-                    }
-                }
-            }
-            handler.postDelayed(confirmationTimeout!!, 7000) // 7 segundos de gracia
-        }
-    }
-    
-    private fun checkFinalResult() {
-        val recentActivity = System.currentTimeMillis() - lastTs < 8000
-        val hadPreboost = hasRecentAudio && (lastReason == "preboost" || recentActivity)
-        
-        showCheckResult(hadPreboost, if (hadPreboost) "Funcionamiento confirmado" else "No se detectó pre-boost")
+        handler.postDelayed(checkTimeout!!, 15000) // 15 segundos
     }
     
     private fun showCheckResult(success: Boolean, message: String) {
         isCheckingFunctionality = false
-        handler.removeCallbacks(confirmationTimeout ?: return)
+        checkTimeout?.let { handler.removeCallbacks(it) }
+        checkTimeout = null
         
         if (success) {
-            btnCheck.text = "✓ FUNCIONANDO CORRECTAMENTE"
+            btnCheck.text = "✓ FUNCIONANDO"
             if (Build.VERSION.SDK_INT >= 21) {
-                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt()) // Verde
+                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt())
             }
-            statusText.text = "✓ $message - Sistema estable"
+            statusText.text = "✓ $message"
             val bg = statusDot.background
             if (bg is GradientDrawable) bg.setColor(0xFF4CAF50.toInt()) else bg.setTint(0xFF4CAF50.toInt())
         } else {
-            btnCheck.text = "⚠ REVISAR CONFIGURACIÓN"
+            btnCheck.text = "⚠ NO DETECTADO"
             if (Build.VERSION.SDK_INT >= 21) {
-                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFE74C3C.toInt()) // Rojo
+                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFE74C3C.toInt())
             }
             statusText.text = "⚠ $message"
             val bg = statusDot.background
             if (bg is GradientDrawable) bg.setColor(0xFFE74C3C.toInt()) else bg.setTint(0xFFE74C3C.toInt())
         }
-        
-        // Restablecer botón después de 5 segundos
+
         handler.postDelayed({
             btnCheck.text = "COMPROBAR FUNCIONAMIENTO"
             if (Build.VERSION.SDK_INT >= 21) {
-                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF2196F3.toInt()) // Azul
+                btnCheck.backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF2196F3.toInt())
             }
             btnCheck.isEnabled = true
-            applyStatusWithTtl() // Volver al estado normal
-        }, 5000)
+            applyStatusWithTtl()
+        }, 3000)
     }
 }

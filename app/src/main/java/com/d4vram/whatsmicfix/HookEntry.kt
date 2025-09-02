@@ -21,13 +21,49 @@ object AppCtx {
 
 class HookEntry : IXposedHookLoadPackage {
 
-    private val targetPkgs = setOf("com.whatsapp", "com.whatsapp.w4b")
+    // NUEVO: Target UNIVERSAL - todos los procesos que usan audio
+    private val targetPkgs = setOf(
+        "com.whatsapp", "com.whatsapp.w4b",           // WhatsApp
+        "android",                                     // Sistema Android
+        "system_server",                              // Servidor del sistema
+        "com.android.server.telecom",                // Servicios de telefonía
+        "media.audio",                                // Servicios de audio
+        "audioserver"                                 // Servidor de audio
+    )
+    
+    // Apps de audio populares para máxima cobertura
+    private val audioApps = setOf(
+        "com.google.android.apps.recorder",          // Grabadora de Google
+        "com.samsung.android.app.memo",              // Samsung Voice Recorder  
+        "com.sec.android.app.voicenote",            // Samsung Voice Note
+        "com.android.soundrecorder",                 // Grabadora AOSP
+        "org.telegram.messenger",                     // Telegram
+        "com.facebook.orca",                         // Messenger
+        "us.zoom.videomeetings",                     // Zoom
+        "com.skype.raider",                          // Skype
+        "com.discord"                                 // Discord
+    )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (!targetPkgs.contains(lpparam.packageName)) return
-        Logx.d("Cargando hooks en ${lpparam.packageName}")
-
-        // Hook temprano para capturar Context y registrar receptores
+        val pkg = lpparam.packageName
+        
+        // Hook UNIVERSAL: cualquier app que use audio O sistema
+        if (!targetPkgs.contains(pkg) && !audioApps.contains(pkg) && !isAudioRelated(pkg)) {
+            return
+        }
+        
+        Logx.d("Cargando hooks UNIVERSALES en ${pkg}")
+        
+        installUniversalHooks(lpparam)
+    }
+    
+    private fun isAudioRelated(pkg: String): Boolean {
+        // Detectar apps que probablemente usen audio por nombre del paquete
+        val audioKeywords = listOf("audio", "record", "voice", "sound", "call", "phone", "media")
+        return audioKeywords.any { pkg.contains(it, ignoreCase = true) }
+    }
+    
+    private fun installUniversalHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
         XposedHelpers.findAndHookMethod(
             "android.app.Application",
             lpparam.classLoader,
