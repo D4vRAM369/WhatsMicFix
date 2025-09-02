@@ -35,71 +35,101 @@ class HookEntry : IXposedHookLoadPackage {
             Context::class.java,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
-                    val ctx = param.args[0] as? Context ?: return
-                    AppCtx.set(ctx)
-                    Logx.d("Application.attach capturado; ctx establecido")
-
-                    // 🔔 Canario: avisa a tu app que el hook está vivo en este proceso
                     try {
-                        ctx.sendBroadcast(
-                            Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
-                                .setPackage(APP_PKG)
-                                .putExtra("msg", "Hook activo en ${ctx.packageName}")
-                        )
-                    } catch (_: Throwable) {}
+                        val ctx = param.args[0] as? Context ?: return
+                        AppCtx.set(ctx)
+                        Logx.d("Application.attach capturado; ctx establecido para ${ctx.packageName}")
 
-                    // RELOAD
-                    try {
-                        val filter = IntentFilter("com.d4vram.whatsmicfix.RELOAD")
-                        if (android.os.Build.VERSION.SDK_INT >= 33) {
-                            ctx.registerReceiver(object : BroadcastReceiver() {
-                                override fun onReceive(c: Context?, i: Intent?) {
-                                    if (i?.action == "com.d4vram.whatsmicfix.RELOAD") {
-                                        Prefs.forceReload()
-                                        Logx.d("RELOAD recibido; invalidado TTL de prefs")
-                                    }
-                                }
-                            }, filter, Context.RECEIVER_EXPORTED)
-                        } else {
-                            @Suppress("UnspecifiedRegisterReceiverFlag")
-                            ctx.registerReceiver(object : BroadcastReceiver() {
-                                override fun onReceive(c: Context?, i: Intent?) {
-                                    if (i?.action == "com.d4vram.whatsmicfix.RELOAD") {
-                                        Prefs.forceReload()
-                                        Logx.d("RELOAD recibido; invalidado TTL de prefs")
-                                    }
-                                }
-                            }, filter)
+                        // Verificación de integridad del contexto
+                        if (ctx.packageName == null || ctx.applicationContext == null) {
+                            Logx.w("Contexto parece inválido: pkg=${ctx.packageName}")
+                            return
                         }
-                        Logx.d("Receiver RELOAD registrado")
-                    } catch (t: Throwable) {
-                        Logx.e("Error registrando receiver RELOAD", t)
-                    }
 
-                    // PING
-                    try {
-                        val filter = IntentFilter("com.d4vram.whatsmicfix.PING")
-                        if (android.os.Build.VERSION.SDK_INT >= 33) {
-                            ctx.registerReceiver(object : BroadcastReceiver() {
-                                override fun onReceive(c: Context?, i: Intent?) {
-                                    if (i?.action == "com.d4vram.whatsmicfix.PING") {
-                                        try { AudioHooks.respondPing() } catch (_: Throwable) {}
-                                    }
-                                }
-                            }, filter, Context.RECEIVER_EXPORTED)
-                        } else {
-                            @Suppress("UnspecifiedRegisterReceiverFlag")
-                            ctx.registerReceiver(object : BroadcastReceiver() {
-                                override fun onReceive(c: Context?, i: Intent?) {
-                                    if (i?.action == "com.d4vram.whatsmicfix.PING") {
-                                        try { AudioHooks.respondPing() } catch (_: Throwable) {}
-                                    }
-                                }
-                            }, filter)
+                        // 🔔 Canario: avisa a tu app que el hook está vivo en este proceso
+                        try {
+                            ctx.sendBroadcast(
+                                Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
+                                    .setPackage(APP_PKG)
+                                    .putExtra("msg", "Hook activo en ${ctx.packageName}")
+                                    .putExtra("hookVersion", "1.3-stable")
+                                    .putExtra("timestamp", System.currentTimeMillis())
+                            )
+                            Logx.d("Canario enviado exitosamente")
+                        } catch (t: Throwable) {
+                            Logx.e("Error enviando canario", t)
                         }
-                        Logx.d("Receiver PING registrado")
-                    } catch (t: Throwable) {
-                        Logx.e("Error registrando receiver PING", t)
+
+                        // RELOAD - Con manejo mejorado de errores
+                        try {
+                            val filter = IntentFilter("com.d4vram.whatsmicfix.RELOAD")
+                            val reloadReceiver = object : BroadcastReceiver() {
+                                override fun onReceive(c: Context?, i: Intent?) {
+                                    try {
+                                        if (i?.action == "com.d4vram.whatsmicfix.RELOAD") {
+                                            Prefs.forceReload()
+                                            Logx.d("RELOAD recibido; invalidado TTL de prefs")
+                                            
+                                            // Confirmar recepción
+                                            c?.sendBroadcast(
+                                                Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
+                                                    .setPackage(APP_PKG)
+                                                    .putExtra("msg", "RELOAD procesado correctamente")
+                                            )
+                                        }
+                                    } catch (t: Throwable) {
+                                        Logx.e("Error procesando RELOAD", t)
+                                    }
+                                }
+                            }
+                            
+                            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                ctx.registerReceiver(reloadReceiver, filter, Context.RECEIVER_EXPORTED)
+                            } else {
+                                @Suppress("UnspecifiedRegisterReceiverFlag")
+                                ctx.registerReceiver(reloadReceiver, filter)
+                            }
+                            Logx.d("Receiver RELOAD registrado exitosamente")
+                        } catch (t: Throwable) {
+                            Logx.e("Error registrando receiver RELOAD", t)
+                        }
+
+                        // PING - Con confirmación de respuesta
+                        try {
+                            val filter = IntentFilter("com.d4vram.whatsmicfix.PING")
+                            val pingReceiver = object : BroadcastReceiver() {
+                                override fun onReceive(c: Context?, i: Intent?) {
+                                    try {
+                                        if (i?.action == "com.d4vram.whatsmicfix.PING") {
+                                            Logx.d("PING recibido, enviando respuesta")
+                                            AudioHooks.respondPing()
+                                            
+                                            // Confirmar que PING fue procesado
+                                            c?.sendBroadcast(
+                                                Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
+                                                    .setPackage(APP_PKG)
+                                                    .putExtra("msg", "PING procesado - hook respondió")
+                                            )
+                                        }
+                                    } catch (t: Throwable) {
+                                        Logx.e("Error procesando PING", t)
+                                    }
+                                }
+                            }
+                            
+                            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                ctx.registerReceiver(pingReceiver, filter, Context.RECEIVER_EXPORTED)
+                            } else {
+                                @Suppress("UnspecifiedRegisterReceiverFlag")
+                                ctx.registerReceiver(pingReceiver, filter)
+                            }
+                            Logx.d("Receiver PING registrado exitosamente")
+                        } catch (t: Throwable) {
+                            Logx.e("Error registrando receiver PING", t)
+                        }
+                        
+                    } catch (mainError: Throwable) {
+                        Logx.e("Error crítico en Application.attach hook", mainError)
                     }
                 }
             }

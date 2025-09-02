@@ -4,7 +4,6 @@
     android:layout_height="match_parent"
     android:background="#111316">
 
-    <!-- Único hijo del ScrollView -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -38,21 +37,6 @@
                 android:textColor="#FFFFFF"/>
         </LinearLayout>
 
-        <!-- Botón debajo, alineado a la derecha -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="8dp"
-            android:gravity="end">
-
-            <Button
-                android:id="@+id/btnCheck"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="COMPROBAR"/>
-        </LinearLayout>
 
         <!-- Contenido principal -->
         <LinearLayout
@@ -70,7 +54,6 @@
                 android:textSize="20sp"
                 android:textColor="#FFFFFF" />
 
-            <!-- Activar/desactivar pre-boost -->
             <Switch
                 android:id="@+id/swEnable"
                 android:layout_width="wrap_content"
@@ -103,7 +86,6 @@
                 android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
                 android:textColor="#8FA3AD" />
 
-            <!-- Opciones de estabilidad -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -141,6 +123,26 @@
                 android:text="Habilitar supresor de ruido"
                 android:textColor="#FFFFFF" />
 
+        </LinearLayout>
+
+        <!-- Botón de comprobación al final -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="20dp"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/btnCheck"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="COMPROBAR FUNCIONAMIENTO"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:backgroundTint="#2196F3"/>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

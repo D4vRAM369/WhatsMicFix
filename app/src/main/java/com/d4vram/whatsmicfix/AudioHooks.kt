@@ -43,18 +43,42 @@ object AudioHooks {
         lastActive = active
         lastReason = reason
         lastTs = System.currentTimeMillis()
-        try {
-            AppCtx.get()?.sendBroadcast(
-                Intent("com.d4vram.whatsmicfix.WFM_STATUS")
-                    .setPackage(APP_PKG) // ← explícito a tu app
-                    .putExtra("active", active)
-                    .putExtra("reason", reason)
-                    .putExtra("sid", sid)
-                    .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
-                    .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
-                    .putExtra("ts", lastTs)
-            )
-        } catch (_: Throwable) {}
+        
+        // Envío con reintentos para mayor estabilidad
+        var attempts = 0
+        val maxAttempts = 3
+        
+        while (attempts < maxAttempts) {
+            try {
+                val ctx = AppCtx.get()
+                if (ctx != null) {
+                    ctx.sendBroadcast(
+                        Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                            .setPackage(APP_PKG)
+                            .putExtra("active", active)
+                            .putExtra("reason", reason)
+                            .putExtra("sid", sid)
+                            .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
+                            .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
+                            .putExtra("ts", lastTs)
+                            .putExtra("attempt", attempts + 1)
+                    )
+                    break // Éxito, salir del bucle
+                } else {
+                    Logx.w("AppCtx es null en intento ${attempts + 1}")
+                }
+            } catch (t: Throwable) {
+                Logx.w("Error en intento ${attempts + 1} de emitStatus: ${t.message}")
+            }
+            attempts++
+            if (attempts < maxAttempts) {
+                try { Thread.sleep(50) } catch (_: InterruptedException) {}
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            Logx.e("Falló emitStatus después de $maxAttempts intentos")
+        }
     }
 
     fun respondPing() {
@@ -78,24 +102,48 @@ object AudioHooks {
             Int::class.javaPrimitiveType,
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(p: MethodHookParam) {
-                    Prefs.reloadIfStale(500)
-                    if (!Prefs.moduleEnabled) return
+                    try {
+                        Prefs.reloadIfStale(500)
+                        if (!Prefs.moduleEnabled) return
 
-                    val origSr  = p.args[1] as Int
-                    val origCh  = p.args[2] as Int
-                    val origFmt = p.args[3] as Int
+                        val origSr  = p.args[1] as Int
+                        val origCh  = p.args[2] as Int
+                        val origFmt = p.args[3] as Int
 
-                    if (Prefs.forceSourceMic) p.args[0] = MediaRecorder.AudioSource.MIC
+                        // Validación más estricta de parámetros
+                        val validSr = if (origSr > 0 && origSr <= 192000) origSr else SR_FALLBACK
+                        val validCh = if (origCh == AudioFormat.CHANNEL_IN_MONO || origCh == AudioFormat.CHANNEL_IN_STEREO) 
+                            origCh else AudioFormat.CHANNEL_IN_MONO
+                        val validFmt = if (origFmt == AudioFormat.ENCODING_PCM_16BIT || origFmt == AudioFormat.ENCODING_PCM_8BIT) 
+                            origFmt else AudioFormat.ENCODING_PCM_16BIT
 
-                    if (!Prefs.respectAppFormat) {
-                        val sr = pickSampleRate(origSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                        p.args[1] = sr
+                        if (Prefs.forceSourceMic) p.args[0] = MediaRecorder.AudioSource.MIC
+
+                        if (!Prefs.respectAppFormat) {
+                            val sr = pickSampleRate(validSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                            p.args[1] = sr
+                            p.args[2] = AudioFormat.CHANNEL_IN_MONO
+                            p.args[3] = AudioFormat.ENCODING_PCM_16BIT
+                        } else {
+                            // Verificación doble de compatibilidad
+                            if (validSr <= 0 || AudioRecord.getMinBufferSize(validSr, validCh, validFmt) <= 0) {
+                                p.args[1] = SR_FALLBACK
+                                p.args[2] = AudioFormat.CHANNEL_IN_MONO
+                                p.args[3] = AudioFormat.ENCODING_PCM_16BIT
+                            } else {
+                                p.args[1] = validSr
+                                p.args[2] = validCh
+                                p.args[3] = validFmt
+                            }
+                        }
+                        
+                        Logx.d("AudioRecord ctor: sr=${p.args[1]}, ch=${p.args[2]}, fmt=${p.args[3]}")
+                    } catch (t: Throwable) {
+                        Logx.e("Error en hook constructor AudioRecord", t)
+                        // Fallback seguro
+                        p.args[1] = SR_FALLBACK
                         p.args[2] = AudioFormat.CHANNEL_IN_MONO
                         p.args[3] = AudioFormat.ENCODING_PCM_16BIT
-                    } else {
-                        if (origSr <= 0 || AudioRecord.getMinBufferSize(origSr, origCh, origFmt) <= 0) {
-                            p.args[1] = SR_FALLBACK
-                        }
                     }
                 }
 

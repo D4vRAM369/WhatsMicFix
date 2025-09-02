@@ -7,14 +7,13 @@
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.WhatsMicFix">
 
-        <!-- LSPosed/Xposed -->
+        <!-- Requisitos de LSPosed/Xposed -->
         <meta-data android:name="xposedmodule" android:value="true" />
-        <meta-data
-            android:name="xposeddescription"
-            android:value="Fuerza perfil de micro correcto en WhatsApp y habilita AGC/NS para arreglar audios bajos en Pixel 8/serie 8 (A14-A16)." />
+        <meta-data android:name="xposeddescription"
+            android:value="Fuerza perfil de micro correcto en WhatsApp y habilita AGC/NS para arreglar audios bajos (A14–A16)." />
         <meta-data android:name="xposedminversion" android:value="93" />
 
-        <!-- Launcher -->
+        <!-- Pantalla de ajustes -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,13 +24,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Diagnostics (no exportada, sin launcher) -->
+        <!-- Opcional, tu pantalla de logs si la usas -->
         <activity
-            android:name=".DiagnosticsActivity"
+            android:name=".DiagnosticActivity"
             android:exported="false"
             android:label="Diagnostics" />
     </application>
 
-    <!-- Sugerencia: define esto en build.gradle (defaultConfig { minSdk = 24 }) -->
-    <!-- <uses-sdk android:minSdkVersion="24" /> -->
 </manifest>
