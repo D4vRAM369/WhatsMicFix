@@ -2,43 +2,32 @@ package com.d4vram.whatsmicfix
 
 import android.content.Context
 import android.content.SharedPreferences
+import de.robv.android.xposed.XSharedPreferences
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 
-// Si tienes el XposedBridge API en el classpath, esto permitirá reload() sin pasar Context.
-@Suppress("ClassName")
-private object __XposedCtx {
-    // Cargamos por reflexión para no romper si no está Xposed en compile-time.
-    fun appContextOrNull(): Context? = try {
-        val cls = Class.forName("de.robv.android.xposed.AndroidAppHelper")
-        val m = cls.getMethod("currentApplication")
-        val app = m.invoke(null)
-        val ctx = app?.javaClass?.getMethod("getApplicationContext")?.invoke(app) as? Context
-        ctx
-    } catch (_: Throwable) { null }
-}
+// Evitamos BuildConfig: paquete del módulo para XSharedPreferences
+private const val MODULE_PKG = "com.d4vram.whatsmicfix"
 
 object Prefs {
 
-    // ===== Archivo de SharedPreferences =====
+    // ===== Archivo y claves =====
     const val FILE = "whatsmicfix_prefs"
 
-    // ===== Claves principales =====
-    const val KEY_ENABLE          = "module_enabled"          // switch global
-    const val KEY_ADVANCED        = "advanced_mode"           // modo avanzado (UI)
-    const val KEY_FACTOR          = "boost_db"                // valor en dB (no factor)
-    const val KEY_FORCE_SOURCE    = "force_source_mic"        // forzar MIC como source
-    const val KEY_ENABLE_AGC      = "enable_agc"              // Automatic Gain Control
-    const val KEY_ENABLE_NS       = "enable_ns"               // Noise Suppression
-    const val KEY_RESPECT_APP_FMT = "respect_app_format"      // respetar formato de la app
-    const val KEY_ENABLE_PREBOOST = "enable_preboost"         // aplicar pre-amplificación previa (opcional)
+    const val KEY_ENABLE          = "module_enabled"
+    const val KEY_ADVANCED        = "advanced_mode"
+    const val KEY_FACTOR          = "boost_db"                // dB (no factor)
+    const val KEY_FORCE_SOURCE    = "force_source_mic"
+    const val KEY_ENABLE_AGC      = "enable_agc"
+    const val KEY_ENABLE_NS       = "enable_ns"
+    const val KEY_RESPECT_APP_FMT = "respect_app_format"
+    const val KEY_ENABLE_PREBOOST = "enable_preboost"
 
     // ===== Estado en memoria =====
     @Volatile var moduleEnabled: Boolean = true
     @Volatile var advancedMode: Boolean = false
-
-    @Volatile var boostDb: Float = 0f        // dB
-    @Volatile var boostFactor: Float = 1f    // lineal = 10^(dB/20)
-
+    @Volatile var boostDb: Float = 0f
+    @Volatile var boostFactor: Float = 1f
     @Volatile var forceSourceMic: Boolean = false
     @Volatile var enableAgc: Boolean = true
     @Volatile var enableNs: Boolean = true
@@ -51,53 +40,53 @@ object Prefs {
 
     private fun dbToLinear(db: Float): Float = 10.0f.pow(db / 20f)
 
-    // ===== API v1.2 =====
+    // cache XSP con TTL para no machacar I/O
+    private var xsp: XSharedPreferences? = null
+    private val lastReloadNs = AtomicLong(0L)
 
-    /** Carga desde disco a memoria. */
-    fun reloadIfStale(ctx: Context) {
-        val s = sp(ctx)
-        moduleEnabled    = s.getBoolean(KEY_ENABLE, true)
-        advancedMode     = s.getBoolean(KEY_ADVANCED, false)
-
-        boostDb          = s.getFloat(KEY_FACTOR, 0f)
-        boostFactor      = dbToLinear(boostDb)
-
-        forceSourceMic   = s.getBoolean(KEY_FORCE_SOURCE, false)
-        enableAgc        = s.getBoolean(KEY_ENABLE_AGC, true)
-        enableNs         = s.getBoolean(KEY_ENABLE_NS, true)
-        respectAppFormat = s.getBoolean(KEY_RESPECT_APP_FMT, true)
-        enablePreboost   = s.getBoolean(KEY_ENABLE_PREBOOST, false)
+    /** Llamar desde UI tras cada cambio para que WA pueda leer el XML (0644). */
+    fun makePrefsWorldReadable(ctx: Context) {
+        try {
+            val f = ctx.getDatabasePath("../shared_prefs/$FILE.xml")
+            if (f.exists()) {
+                f.setReadable(true, false)   // -rw-r--r--
+                f.setExecutable(false, false)
+            }
+        } catch (_: Throwable) { /* best-effort */ }
     }
 
-    /** Alias por compatibilidad (algunos archivos llaman a `reload`). */
-    fun reload(ctx: Context) = reloadIfStale(ctx)
+    /** Forzar que el próximo reload ignore el TTL (usado por broadcast RELOAD). */
+    fun forceReload() { lastReloadNs.set(0L) }
 
-    /** Overload por compatibilidad cuando (mal) pasan un Int en vez de Context. */
-    fun reloadIfStale(@Suppress("UNUSED_PARAMETER") dummy: Int) {
-        // Intentamos resolver contexto vía Xposed si es posible.
-        __XposedCtx.appContextOrNull()?.let { reloadIfStale(it) }
+    /** Recarga con TTL. Si estamos en el módulo, usa SP normales; si no, XSharedPreferences. */
+    fun reloadIfStale(ttlMs: Long = 500) {
+        AppCtx.get()?.let { app ->
+            if (app.packageName == MODULE_PKG) {
+                loadFromSp(app)
+                return
+            }
+        }
+        loadFromXsp(ttlMs)
     }
 
-    /** Overload sin parámetros: usa contexto de AndroidAppHelper si existe. */
-    fun reload() {
-        __XposedCtx.appContextOrNull()?.let { reloadIfStale(it) }
-    }
+    /** Compatibilidad con tu UI actual (llama desde Activity). */
+    fun reloadIfStale(ctx: Context) = loadFromSp(ctx)
+    fun reload(ctx: Context) = loadFromSp(ctx)
+    fun reload() = reloadIfStale(500)
 
-    /** Guarda el básico (enable + dB + adv) y refresca memoria. */
+    /** Guardados desde UI (v1.2 mantiene esta firma). */
     fun saveFromUi(ctx: Context, enable: Boolean, db: Float, adv: Boolean) {
         sp(ctx).edit()
             .putBoolean(KEY_ENABLE, enable)
             .putBoolean(KEY_ADVANCED, adv)
             .putFloat(KEY_FACTOR, db)
             .apply()
-
         moduleEnabled = enable
         advancedMode  = adv
         boostDb       = db
         boostFactor   = dbToLinear(db)
     }
 
-    /** Guarda los toggles avanzados. */
     fun saveAdvancedToggles(
         ctx: Context,
         forceMic: Boolean = forceSourceMic,
@@ -113,11 +102,50 @@ object Prefs {
             .putBoolean(KEY_RESPECT_APP_FMT, respectFmt)
             .putBoolean(KEY_ENABLE_PREBOOST, preboost)
             .apply()
-
         forceSourceMic   = forceMic
         enableAgc        = agc
         enableNs         = ns
         respectAppFormat = respectFmt
         enablePreboost   = preboost
+    }
+
+    // ===== Carga interna =====
+
+    private fun loadFromSp(ctx: Context) {
+        val s = sp(ctx)
+        moduleEnabled    = s.getBoolean(KEY_ENABLE, moduleEnabled)
+        advancedMode     = s.getBoolean(KEY_ADVANCED, advancedMode)
+        boostDb          = s.getFloat(KEY_FACTOR, boostDb)
+        boostFactor      = dbToLinear(boostDb)
+        forceSourceMic   = s.getBoolean(KEY_FORCE_SOURCE, forceSourceMic)
+        enableAgc        = s.getBoolean(KEY_ENABLE_AGC, enableAgc)
+        enableNs         = s.getBoolean(KEY_ENABLE_NS, enableNs)
+        respectAppFormat = s.getBoolean(KEY_RESPECT_APP_FMT, respectAppFormat)
+        enablePreboost   = s.getBoolean(KEY_ENABLE_PREBOOST, enablePreboost)
+    }
+
+    private fun loadFromXsp(ttlMs: Long) {
+        val now = System.nanoTime()
+        val last = lastReloadNs.get()
+        if (now - last < ttlMs * 1_000_000L) return
+        lastReloadNs.set(now)
+
+        val prefs = (xsp ?: XSharedPreferences(MODULE_PKG, FILE)).also {
+            it.makeWorldReadable()
+            it.reload()
+            xsp = it
+        }
+
+        moduleEnabled    = prefs.getBoolean(KEY_ENABLE, moduleEnabled)
+        advancedMode     = prefs.getBoolean(KEY_ADVANCED, advancedMode)
+        boostDb          = try { prefs.getFloat(KEY_FACTOR, boostDb) } catch (_: Throwable) {
+            prefs.getString(KEY_FACTOR, null)?.toFloatOrNull() ?: boostDb
+        }
+        boostFactor      = dbToLinear(boostDb)
+        forceSourceMic   = prefs.getBoolean(KEY_FORCE_SOURCE, forceSourceMic)
+        enableAgc        = prefs.getBoolean(KEY_ENABLE_AGC, enableAgc)
+        enableNs         = prefs.getBoolean(KEY_ENABLE_NS, enableNs)
+        respectAppFormat = prefs.getBoolean(KEY_RESPECT_APP_FMT, respectAppFormat)
+        enablePreboost   = prefs.getBoolean(KEY_ENABLE_PREBOOST, enablePreboost)
     }
 }

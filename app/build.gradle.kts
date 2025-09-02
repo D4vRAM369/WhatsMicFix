@@ -18,8 +18,8 @@ android {
         applicationId = "com.d4vram.whatsmicfix"
         minSdk = 24
         targetSdk = 35
-        versionCode = 120
-        versionName = "1.2"
+        versionCode = 130
+        versionName = "1.3"
     }
 
     signingConfigs {
