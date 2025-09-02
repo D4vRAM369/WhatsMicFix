@@ -14,18 +14,16 @@ import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 
+private const val APP_PKG = "com.d4vram.whatsmicfix"
+
 object AudioHooks {
 
     private const val SR_FALLBACK = 44100
     private const val SR_HIGH = 48000
 
-    // Mapa: AudioRecord -> ¿PCM16?
     private val isPcm16 = WeakHashMap<AudioRecord, Boolean>()
-
-    // FX por sesión para liberar en release()
     private val fxBySession = ConcurrentHashMap<Int, Pair<AutomaticGainControl?, NoiseSuppressor?>>()
 
-    // Estado para el indicador (app UI)
     @Volatile private var lastActive = false
     @Volatile private var lastReason = "init"
     @Volatile private var lastTs = 0L
@@ -40,16 +38,15 @@ object AudioHooks {
         hookRelease()
     }
 
-    // ========= Indicador: emisión y respuesta =========
-
+    // ===== Indicador: emisión y respuesta =====
     private fun emitStatus(active: Boolean, reason: String, ar: AudioRecord?, sid: Int) {
         lastActive = active
         lastReason = reason
         lastTs = System.currentTimeMillis()
-
         try {
             AppCtx.get()?.sendBroadcast(
                 Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                    .setPackage(APP_PKG) // ← explícito a tu app
                     .putExtra("active", active)
                     .putExtra("reason", reason)
                     .putExtra("sid", sid)
@@ -64,6 +61,7 @@ object AudioHooks {
         try {
             AppCtx.get()?.sendBroadcast(
                 Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                    .setPackage(APP_PKG)
                     .putExtra("active", lastActive)
                     .putExtra("reason", lastReason)
                     .putExtra("ts", lastTs)
@@ -71,16 +69,13 @@ object AudioHooks {
         } catch (_: Throwable) {}
     }
 
-    // ========= Constructors =========
-
+    // ===== Constructors =====
     private fun hookAudioRecordCtor() {
         XposedHelpers.findAndHookConstructor(
             AudioRecord::class.java,
-            Int::class.javaPrimitiveType, // audioSource
-            Int::class.javaPrimitiveType, // sampleRate
-            Int::class.javaPrimitiveType, // channelConfig
-            Int::class.javaPrimitiveType, // audioFormat
-            Int::class.javaPrimitiveType, // bufferSize
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(p: MethodHookParam) {
                     Prefs.reloadIfStale(500)
@@ -90,18 +85,14 @@ object AudioHooks {
                     val origCh  = p.args[2] as Int
                     val origFmt = p.args[3] as Int
 
-                    if (Prefs.forceSourceMic) {
-                        p.args[0] = MediaRecorder.AudioSource.MIC
-                    }
+                    if (Prefs.forceSourceMic) p.args[0] = MediaRecorder.AudioSource.MIC
 
                     if (!Prefs.respectAppFormat) {
-                        // Ruta estable para pre-boost
                         val sr = pickSampleRate(origSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                         p.args[1] = sr
                         p.args[2] = AudioFormat.CHANNEL_IN_MONO
                         p.args[3] = AudioFormat.ENCODING_PCM_16BIT
                     } else {
-                        // Respetar formato, pero sanear SR inválido
                         if (origSr <= 0 || AudioRecord.getMinBufferSize(origSr, origCh, origFmt) <= 0) {
                             p.args[1] = SR_FALLBACK
                         }
@@ -110,21 +101,16 @@ object AudioHooks {
 
                 override fun afterHookedMethod(p: MethodHookParam) {
                     val ar = p.thisObject as AudioRecord
-                    // Determina si es PCM16 (en API pública audioFormat es un Int)
                     val enc = try { ar.audioFormat } catch (_: Throwable) { AudioFormat.ENCODING_INVALID }
                     isPcm16[ar] = (enc == AudioFormat.ENCODING_PCM_16BIT)
 
-                    // Intentar fijar mic interno si procede
                     if (Build.VERSION.SDK_INT >= 28 && Prefs.forceSourceMic) {
                         try {
                             AppCtx.get()?.let { ctx ->
                                 val am = ctx.getSystemService(AudioManager::class.java)
                                 val dev = am?.getDevices(AudioManager.GET_DEVICES_INPUTS)
                                     ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                                if (dev != null) {
-                                    ar.setPreferredDevice(dev)
-                                    Logx.d("setPreferredDevice(BUILTIN_MIC) aplicado")
-                                }
+                                if (dev != null) ar.setPreferredDevice(dev)
                             }
                         } catch (_: Throwable) {}
                     }
@@ -139,57 +125,38 @@ object AudioHooks {
         return if (ok1) first else SR_FALLBACK
     }
 
-    // ========= Builder =========
-
+    // ===== Builder =====
     private fun hookAudioRecordBuilder(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
             val builderCls = XposedHelpers.findClass("android.media.AudioRecord\$Builder", lpparam.classLoader)
 
-            // (Opcional) Forzar MIC si el toggle está activo
-            XposedHelpers.findAndHookMethod(
-                builderCls, "setAudioSource",
-                Int::class.javaPrimitiveType,
-                object : XC_MethodHook() {
+            XposedHelpers.findAndHookMethod(builderCls, "setAudioSource",
+                Int::class.javaPrimitiveType, object : XC_MethodHook() {
                     override fun beforeHookedMethod(p: MethodHookParam) {
                         Prefs.reloadIfStale(500)
                         if (Prefs.forceSourceMic) p.args[0] = MediaRecorder.AudioSource.MIC
                     }
-                }
-            )
+                })
 
-            // (Importante) Sanear el formato que establece WA por Builder
-            XposedHelpers.findAndHookMethod(
-                builderCls, "setAudioFormat",
-                AudioFormat::class.java,
-                object : XC_MethodHook() {
+            XposedHelpers.findAndHookMethod(builderCls, "setAudioFormat",
+                AudioFormat::class.java, object : XC_MethodHook() {
                     override fun beforeHookedMethod(p: MethodHookParam) {
                         Prefs.reloadIfStale(500)
                         val inFmt = p.args[0] as AudioFormat? ?: return
 
                         if (!Prefs.respectAppFormat) {
-                            // Ruta estable para pre-boost: PCM16 / mono con SR válido
-                            val sr = pickSampleRate(
-                                inFmt.sampleRate,
-                                AudioFormat.CHANNEL_IN_MONO,
-                                AudioFormat.ENCODING_PCM_16BIT
-                            )
+                            val sr = pickSampleRate(inFmt.sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                             p.args[0] = AudioFormat.Builder()
                                 .setSampleRate(sr)
                                 .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                                 .build()
                         } else {
-                            // Respetar formato, pero con fallback si SR/enc inválidos
                             val srOk = inFmt.sampleRate > 0 &&
-                                    AudioRecord.getMinBufferSize(
-                                        inFmt.sampleRate,
-                                        inFmt.channelMask,
-                                        inFmt.encoding
-                                    ) > 0
+                                    AudioRecord.getMinBufferSize(inFmt.sampleRate, inFmt.channelMask, inFmt.encoding) > 0
                             val sr = if (srOk) inFmt.sampleRate else SR_FALLBACK
                             val enc = if (inFmt.encoding == AudioFormat.ENCODING_INVALID)
                                 AudioFormat.ENCODING_PCM_16BIT else inFmt.encoding
-
                             if (sr != inFmt.sampleRate || enc != inFmt.encoding) {
                                 p.args[0] = AudioFormat.Builder()
                                     .setSampleRate(sr)
@@ -199,46 +166,40 @@ object AudioHooks {
                             }
                         }
                     }
-                }
-            )
+                })
 
-            // (Nuevo) Tras build(): marcar PCM16 y fijar mic preferido si procede
-            XposedHelpers.findAndHookMethod(
-                builderCls, "build",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        val ar = p.result as? AudioRecord ?: return
+            XposedHelpers.findAndHookMethod(builderCls, "build", object : XC_MethodHook() {
+                override fun afterHookedMethod(p: MethodHookParam) {
+                    val ar = p.result as? AudioRecord ?: return
+                    val enc = try { ar.audioFormat } catch (_: Throwable) { AudioFormat.ENCODING_INVALID }
+                    isPcm16[ar] = (enc == AudioFormat.ENCODING_PCM_16BIT)
 
-                        // audioFormat es Int => comparar directamente
-                        val enc = try { ar.audioFormat } catch (_: Throwable) {
-                            AudioFormat.ENCODING_INVALID
-                        }
-                        isPcm16[ar] = (enc == AudioFormat.ENCODING_PCM_16BIT)
-
-                        if (Build.VERSION.SDK_INT >= 28 && Prefs.forceSourceMic) {
-                            try {
-                                AppCtx.get()?.let { ctx ->
-                                    val am = ctx.getSystemService(AudioManager::class.java)
-                                    val dev = am?.getDevices(AudioManager.GET_DEVICES_INPUTS)
-                                        ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                                    if (dev != null) ar.setPreferredDevice(dev)
-                                }
-                            } catch (_: Throwable) { /* no crítico */ }
-                        }
+                    if (Build.VERSION.SDK_INT >= 28 && Prefs.forceSourceMic) {
+                        try {
+                            AppCtx.get()?.let { ctx ->
+                                val am = ctx.getSystemService(AudioManager::class.java)
+                                val dev = am?.getDevices(AudioManager.GET_DEVICES_INPUTS)
+                                    ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                                if (dev != null) ar.setPreferredDevice(dev)
+                            }
+                        } catch (_: Throwable) {}
                     }
                 }
-            )
+            })
         } catch (t: Throwable) {
             Logx.e("No se pudo hookear AudioRecord.Builder", t)
         }
     }
 
-    // ========= startRecording / release (para AGC/NS + estado) =========
-
+    // ===== startRecording / release =====
     private fun hookStartRecording() {
         fun sendDiag(msg: String) {
             try {
-                AppCtx.get()?.sendBroadcast(Intent("com.d4vram.whatsmicfix.DIAG_EVENT").putExtra("msg", msg))
+                AppCtx.get()?.sendBroadcast(
+                    Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
+                        .setPackage(APP_PKG)
+                        .putExtra("msg", msg)
+                )
             } catch (_: Throwable) {}
         }
 
@@ -251,7 +212,6 @@ object AudioHooks {
                 val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                 if (sid <= 0) return
 
-                // Evita duplicados por si la ROM ya creó FX
                 if (!fxBySession.containsKey(sid)) {
                     val agc = if (Prefs.enableAgc && AutomaticGainControl.isAvailable()) {
                         try { AutomaticGainControl.create(sid)?.apply { enabled = true } } catch (_: Throwable) { null }
@@ -262,10 +222,8 @@ object AudioHooks {
                     fxBySession[sid] = Pair(agc, ns)
                 }
 
-                Logx.d("FX adjuntos sid=$sid (AGC=${fxBySession[sid]?.first!=null}, NS=${fxBySession[sid]?.second!=null})")
                 sendDiag("startRecording: sid=$sid, AGC=${fxBySession[sid]?.first!=null}, NS=${fxBySession[sid]?.second!=null}, sr=${try { ar.sampleRate } catch (_: Throwable) { -1 }}, enc=${try { ar.audioFormat } catch (_: Throwable) { -1 }}")
 
-                // Estado para la app: activo si pre-boost está habilitado y es PCM16
                 emitStatus(Prefs.enablePreboost && (isPcm16[ar] == true), "start", ar, sid)
             }
         })
@@ -284,14 +242,12 @@ object AudioHooks {
                     }
                 }
                 isPcm16.remove(ar)
-                // Emite estado inactivo (opcional)
                 emitStatus(false, "release", ar, sid)
             }
         })
     }
 
-    // ========= read(...) con pre-boost (PCM16) =========
-
+    // ===== read(...) con pre-boost =====
     private fun hookReadShort() {
         XposedHelpers.findAndHookMethod(
             AudioRecord::class.java, "read",
@@ -300,7 +256,6 @@ object AudioHooks {
                 override fun afterHookedMethod(p: MethodHookParam) {
                     Prefs.reloadIfStale(500)
                     if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
-
                     val count = (p.result as? Int) ?: return
                     if (count <= 0) return
 
@@ -313,8 +268,6 @@ object AudioHooks {
                     if (len <= 0) return
 
                     preboostShorts(buf, off, len, Prefs.boostFactor)
-
-                    // Estado: estamos aplicando pre-boost
                     val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                     emitStatus(true, "preboost", ar, sid)
                 }
@@ -330,7 +283,6 @@ object AudioHooks {
                 override fun afterHookedMethod(p: MethodHookParam) {
                     Prefs.reloadIfStale(500)
                     if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
-
                     val count = (p.result as? Int) ?: return
                     if (count <= 0) return
 
@@ -343,7 +295,6 @@ object AudioHooks {
                     if (len <= 1) return
 
                     preboostPcm16LeBytes(buf, off, len, Prefs.boostFactor)
-
                     val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                     emitStatus(true, "preboost", ar, sid)
                 }
@@ -360,7 +311,6 @@ object AudioHooks {
                     override fun afterHookedMethod(p: MethodHookParam) {
                         Prefs.reloadIfStale(500)
                         if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
-
                         val count = (p.result as? Int) ?: return
                         if (count <= 0) return
 
@@ -372,7 +322,6 @@ object AudioHooks {
                         if (valid <= 1) return
 
                         preboostPcm16LeByteBuffer(bb, valid, Prefs.boostFactor)
-
                         val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                         emitStatus(true, "preboost", ar, sid)
                     }
@@ -383,8 +332,7 @@ object AudioHooks {
         }
     }
 
-    // ========= helpers de audio =========
-
+    // ===== helpers =====
     private fun clamp16(x: Int): Short {
         return when {
             x > Short.MAX_VALUE.toInt() -> Short.MAX_VALUE
@@ -394,7 +342,6 @@ object AudioHooks {
     }
 
     private fun preboostShorts(buf: ShortArray, off: Int, len: Int, factor: Float) {
-        // Q10 fixed point: mult por (factor*1024)
         val q = (factor * 1024f + 0.5f).toInt()
         val end = off + len
         var i = off
