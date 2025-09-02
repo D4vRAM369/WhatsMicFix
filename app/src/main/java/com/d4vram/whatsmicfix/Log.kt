@@ -14,4 +14,8 @@ object Logx {
         XposedBridge.log("E/$TAG: $msg")
         t?.let { XposedBridge.log(it) }
     }
+    
+    fun w(msg: String) {
+        if (enabled) XposedBridge.log("W/$TAG: $msg")
+    }
 }
