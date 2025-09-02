@@ -68,7 +68,7 @@ object Prefs {
         xsp = null
     }
 
-    fun reloadIfStale(ttlMs: Long = 500) {
+    fun reloadIfStale(ttlMs: Long = 2000) {
         AppCtx.get()?.let { app ->
             if (app.packageName == MODULE_PKG) {
                 loadFromSp(app)
@@ -141,7 +141,7 @@ object Prefs {
     private fun loadFromXsp(ttlMs: Long) {
         val now = System.nanoTime()
         val last = lastReloadNs.get()
-        if (now - last < ttlMs * 1_000_000L) return
+        if (now - last < ttlMs * 1_000_000L && xsp != null) return
         lastReloadNs.set(now)
 
         try {

@@ -227,6 +227,11 @@ class MainActivity : AppCompatActivity() {
         receiverRegistered = true
     }
     sendToWa("com.d4vram.whatsmicfix.PING")
+    
+    // Mini-heartbeat para desatascar el estado
+    for (i in 1..9) {
+        handler.postDelayed({ sendToWa("com.d4vram.whatsmicfix.PING") }, 1000L * i)
+    }
 }
 
 override fun onPause() {
