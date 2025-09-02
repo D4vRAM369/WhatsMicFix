@@ -85,7 +85,7 @@ object AudioHooks {
                 } else {
                     1.0f
                 }
-                
+
                 // Solo actualizar si hay cambio significativo
                 if (kotlin.math.abs(globalBoostFactor - newFactor) > 0.05f) {
                     globalBoostFactor = newFactor
@@ -256,9 +256,9 @@ object AudioHooks {
         if (compressorStates.containsKey(ar)) {
             return // Evitar reinitialización
         }
-        
-        val attackSamples = (ATTACK_TIME * sampleRate).toInt()
-        val releaseSamples = (RELEASE_TIME * sampleRate).toInt()
+
+        val attackSamples = (ATTACK_TIME * sampleRate).toInt().coerceAtLeast(1)
+        val releaseSamples = (RELEASE_TIME * sampleRate).toInt().coerceAtLeast(1)
 
         compressorStates[ar] = CompressorState(
             envelope = 0f,
@@ -358,39 +358,43 @@ object AudioHooks {
         XposedHelpers.findAndHookMethod(AudioRecord::class.java, "startRecording", object : XC_MethodHook() {
             override fun afterHookedMethod(p: MethodHookParam) {
                 updateGlobalBoostFactor()
-                if (!Prefs.moduleEnabled) return
+                try {
+                    if (!Prefs.moduleEnabled) return
 
-                val ar = p.thisObject as AudioRecord
-                val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
-                if (sid <= 0) return
+                    val ar = p.thisObject as AudioRecord
+                    val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+                    if (sid <= 0) return
 
-                // Verificar que el compresor esté inicializado
-                if (!compressorStates.containsKey(ar)) {
-                    val sr = try { ar.sampleRate } catch (_: Throwable) { SR_FALLBACK }
-                    initCompressorForRecord(ar, sr)
+                    // Verificar que el compresor esté inicializado
+                    if (!compressorStates.containsKey(ar)) {
+                        val sr = try { ar.sampleRate } catch (_: Throwable) { SR_FALLBACK }
+                        initCompressorForRecord(ar, sr)
+                    }
+
+                    if (!fxBySession.containsKey(sid)) {
+                        val agc = if (Prefs.enableAgc && AutomaticGainControl.isAvailable()) {
+                            try {
+                                AutomaticGainControl.create(sid)?.apply {
+                                    enabled = true
+                                }
+                            } catch (_: Throwable) { null }
+                        } else null
+
+                        val ns = if (Prefs.enableNs && NoiseSuppressor.isAvailable()) {
+                            try {
+                                NoiseSuppressor.create(sid)?.apply {
+                                    enabled = true
+                                }
+                            } catch (_: Throwable) { null }
+                        } else null
+
+                        fxBySession[sid] = Pair(agc, ns)
+                    }
+
+                    emitStatus(Prefs.enablePreboost && (isPcm16[ar] == true), "start", ar, sid)
+                } catch (t: Throwable) {
+                    Logx.e("hookStartRecording error", t)
                 }
-
-                if (!fxBySession.containsKey(sid)) {
-                    val agc = if (Prefs.enableAgc && AutomaticGainControl.isAvailable()) {
-                        try {
-                            AutomaticGainControl.create(sid)?.apply {
-                                enabled = true
-                            }
-                        } catch (_: Throwable) { null }
-                    } else null
-
-                    val ns = if (Prefs.enableNs && NoiseSuppressor.isAvailable()) {
-                        try {
-                            NoiseSuppressor.create(sid)?.apply {
-                                enabled = true
-                            }
-                        } catch (_: Throwable) { null }
-                    } else null
-
-                    fxBySession[sid] = Pair(agc, ns)
-                }
-
-                emitStatus(Prefs.enablePreboost && (isPcm16[ar] == true), "start", ar, sid)
             }
         })
     }
@@ -398,19 +402,23 @@ object AudioHooks {
     private fun hookRelease() {
         XposedHelpers.findAndHookMethod(AudioRecord::class.java, "release", object : XC_MethodHook() {
             override fun beforeHookedMethod(p: MethodHookParam) {
-                val ar = p.thisObject as AudioRecord
-                val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
-                if (sid > 0) {
-                    fxBySession.remove(sid)?.let { (agc, ns) ->
-                        try { agc?.release() } catch (_: Throwable) {}
-                        try { ns?.release() } catch (_: Throwable) {}
-                        Logx.d("FX liberados sid=$sid")
+                try {
+                    val ar = p.thisObject as AudioRecord
+                    val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+                    if (sid > 0) {
+                        fxBySession.remove(sid)?.let { (agc, ns) ->
+                            try { agc?.release() } catch (_: Throwable) {}
+                            try { ns?.release() } catch (_: Throwable) {}
+                            Logx.d("FX liberados sid=$sid")
+                        }
                     }
+                    isPcm16.remove(ar)
+                    compressorStates.remove(ar)
+                    lookaheadBuffers.remove(ar)
+                    emitStatus(false, "release", ar, sid)
+                } catch (t: Throwable) {
+                    Logx.e("hookRelease error", t)
                 }
-                isPcm16.remove(ar)
-                compressorStates.remove(ar)
-                lookaheadBuffers.remove(ar)
-                emitStatus(false, "release", ar, sid)
             }
         })
     }
@@ -421,26 +429,32 @@ object AudioHooks {
             ShortArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(p: MethodHookParam) {
-                    val count = (p.result as? Int) ?: return
-                    if (count <= 0) return
+                    try {
+                        Prefs.reloadIfStale(200) // asegurar prefs al leer
+                        val count = (p.result as? Int) ?: return
+                        if (count <= 0) return
 
-                    val ar = p.thisObject as AudioRecord
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
+                        val ar = p.thisObject as AudioRecord
+                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
-                    val buf = p.args[0] as ShortArray
-                    val off = p.args[1] as Int
-                    val len = min(count, buf.size - off)
-                    if (len <= 0) return
+                        val buf = p.args[0] as ShortArray
+                        val off = p.args[1] as Int
+                        val len = min(count, buf.size - off)
+                        if (len <= 0) return
 
-                    processWithCompressor(buf, off, len, globalBoostFactor, ar)
-                    totalPreBoostsApplied++
+                        processWithCompressor(buf, off, len, globalBoostFactor, ar)
+                        totalPreBoostsApplied++
 
-                    val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+                        val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
 
-                    lastPreboostTs = System.currentTimeMillis()
-                    lastPreboostBoost = globalBoostFactor
+                        // marca el preboost reciente
+                        lastPreboostTs = System.currentTimeMillis()
+                        lastPreboostBoost = globalBoostFactor
 
-                    emitStatus(true, "preboost", ar, sid)
+                        emitStatus(true, "preboost", ar, sid)
+                    } catch (t: Throwable) {
+                        Logx.e("hookReadShort error", t)
+                    }
                 }
             }
         )
@@ -452,24 +466,31 @@ object AudioHooks {
             ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(p: MethodHookParam) {
-                    val count = (p.result as? Int) ?: return
-                    if (count <= 0) return
+                    try {
+                        Prefs.reloadIfStale(200)
+                        val count = (p.result as? Int) ?: return
+                        if (count <= 0) return
 
-                    val ar = p.thisObject as AudioRecord
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
+                        val ar = p.thisObject as AudioRecord
+                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
-                    val buf = p.args[0] as ByteArray
-                    val off = p.args[1] as Int
-                    val len = min(count, buf.size - off)
-                    if (len <= 1) return
+                        val buf = p.args[0] as ByteArray
+                        val off = p.args[1] as Int
+                        val len = min(count, buf.size - off)
+                        if (len <= 1) return
 
-                    processBytesWithCompressor(buf, off, len, globalBoostFactor, ar)
-                    totalPreBoostsApplied++
+                        processBytesWithCompressor(buf, off, len, globalBoostFactor, ar)
+                        totalPreBoostsApplied++
 
-                    val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
-                    lastPreboostTs = System.currentTimeMillis()
-                    lastPreboostBoost = globalBoostFactor
-                    emitStatus(true, "preboost", ar, sid)
+                        val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+
+                        lastPreboostTs = System.currentTimeMillis()
+                        lastPreboostBoost = globalBoostFactor
+
+                        emitStatus(true, "preboost", ar, sid)
+                    } catch (t: Throwable) {
+                        Logx.e("hookReadByte error", t)
+                    }
                 }
             }
         )
@@ -482,23 +503,28 @@ object AudioHooks {
                 ByteBuffer::class.java, Int::class.javaPrimitiveType,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(p: MethodHookParam) {
-                        val count = (p.result as? Int) ?: return
-                        if (count <= 0) return
+                        try {
+                            Prefs.reloadIfStale(200)
+                            val count = (p.result as? Int) ?: return
+                            if (count <= 0) return
 
-                        val ar = p.thisObject as AudioRecord
-                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
+                            val ar = p.thisObject as AudioRecord
+                            if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
-                        val bb = p.args[0] as ByteBuffer
-                        val valid = min(count, bb.remaining())
-                        if (valid <= 1) return
+                            val bb = p.args[0] as ByteBuffer
+                            val valid = min(count, bb.remaining())
+                            if (valid <= 1) return
 
-                        processByteBufferWithCompressor(bb, valid, globalBoostFactor, ar)
-                        totalPreBoostsApplied++
+                            processByteBufferWithCompressor(bb, valid, globalBoostFactor, ar)
+                            totalPreBoostsApplied++
 
-                        val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
-                        lastPreboostTs = System.currentTimeMillis()
-                        lastPreboostBoost = globalBoostFactor
-                        emitStatus(true, "preboost", ar, sid)
+                            val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+                            lastPreboostTs = System.currentTimeMillis()
+                            lastPreboostBoost = globalBoostFactor
+                            emitStatus(true, "preboost", ar, sid)
+                        } catch (t: Throwable) {
+                            Logx.e("hookReadByteBuffer error", t)
+                        }
                     }
                 }
             )

@@ -90,7 +90,7 @@ object Prefs {
             .putBoolean(KEY_ENABLE, enable)
             .putBoolean(KEY_ADVANCED, adv)
             .putFloat(KEY_FACTOR, limitedDb)
-            .apply()
+            .commit()
 
         moduleEnabled = enable
         advancedMode  = adv
@@ -114,7 +114,7 @@ object Prefs {
             .putBoolean(KEY_ENABLE_NS, ns)
             .putBoolean(KEY_RESPECT_APP_FMT, respectFmt)
             .putBoolean(KEY_ENABLE_PREBOOST, preboost)
-            .apply()
+            .commit()
 
         forceSourceMic   = forceMic
         enableAgc        = agc
