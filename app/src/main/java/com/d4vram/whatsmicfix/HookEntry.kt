@@ -10,6 +10,8 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.util.concurrent.atomic.AtomicReference
 
+private const val APP_PKG = "com.d4vram.whatsmicfix" // para broadcasts de vuelta a tu app
+
 /** Guarda un ApplicationContext accesible desde los hooks. */
 object AppCtx {
     private val ref = AtomicReference<Context?>(null)
@@ -19,10 +21,7 @@ object AppCtx {
 
 class HookEntry : IXposedHookLoadPackage {
 
-    private val targetPkgs = setOf(
-        "com.whatsapp",
-        "com.whatsapp.w4b" // Business
-    )
+    private val targetPkgs = setOf("com.whatsapp", "com.whatsapp.w4b")
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (!targetPkgs.contains(lpparam.packageName)) return
@@ -40,7 +39,16 @@ class HookEntry : IXposedHookLoadPackage {
                     AppCtx.set(ctx)
                     Logx.d("Application.attach capturado; ctx establecido")
 
-                    // RELOAD -> invalidar TTL de prefs
+                    // 🔔 Canario: avisa a tu app que el hook está vivo en este proceso
+                    try {
+                        ctx.sendBroadcast(
+                            Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
+                                .setPackage(APP_PKG)
+                                .putExtra("msg", "Hook activo en ${ctx.packageName}")
+                        )
+                    } catch (_: Throwable) {}
+
+                    // RELOAD
                     try {
                         val filter = IntentFilter("com.d4vram.whatsmicfix.RELOAD")
                         if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -68,7 +76,7 @@ class HookEntry : IXposedHookLoadPackage {
                         Logx.e("Error registrando receiver RELOAD", t)
                     }
 
-                    // PING -> responder con último estado (para el indicador de la app)
+                    // PING
                     try {
                         val filter = IntentFilter("com.d4vram.whatsmicfix.PING")
                         if (android.os.Build.VERSION.SDK_INT >= 33) {
