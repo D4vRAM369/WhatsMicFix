@@ -20,6 +20,8 @@ import java.io.File
 import kotlin.math.log10
 import kotlin.math.pow
 
+private var receiverRegistered = false
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var swEnable: Switch
@@ -38,6 +40,9 @@ class MainActivity : AppCompatActivity() {
     private var lastReason = "init"
     private var lastTs = 0L
 
+    private var recentPreboostAgeMs: Long = Long.MAX_VALUE
+    private var recentPreboostBoost: Float = 0f
+
     private val handler = Handler(Looper.getMainLooper())
     private var checkStartTime = 0L
     private var isCheckingFunctionality = false
@@ -55,17 +60,31 @@ class MainActivity : AppCompatActivity() {
                     lastReason = intent.getStringExtra("reason") ?: ""
                     lastTs     = intent.getLongExtra("ts", 0L)
 
+                    // NUEVO: leer el "preboost reciente"
+                    recentPreboostAgeMs = intent.getLongExtra("recentPreboostAgeMs", Long.MAX_VALUE)
+                    recentPreboostBoost = intent.getFloatExtra("recentPreboostBoost", 0f)
+
                     val boostFactor = intent.getFloatExtra("boostFactor", 0f)
                     val totalBoosts = intent.getIntExtra("totalBoosts", 0)
 
-                    if (isCheckingFunctionality && lastReason == "preboost") {
-                        showCheckResult(true, "Audio detectado y procesado correctamente (${String.format("%.1f", boostFactor)}x)")
+                    // lee antes los extras:
+                    recentPreboostAgeMs = intent.getLongExtra("recentPreboostAgeMs", Long.MAX_VALUE)
+                    recentPreboostBoost = intent.getFloatExtra("recentPreboostBoost", 0f)
+
+
+                    // ACTUALIZADO: éxito si hubo preboost en vivo o en ≤ 8 s
+                   
+                    // éxito si estábamos comprobando y hubo preboost en vivo O en los últimos 8s
+                    if (isCheckingFunctionality && (lastReason == "preboost" || recentPreboostAgeMs <= 8000L)) {
+                        val bf = if (recentPreboostBoost > 0f) recentPreboostBoost
+                                 else intent.getFloatExtra("boostFactor", 0f)
+                        showCheckResult(true, "Audio detectado y procesado correctamente (${String.format("%.1f", bf)}x)")
                     }
 
                     if (boostFactor > 0f && totalBoosts > 0) {
                         statusText.text = "Boost activo: ${String.format("%.1f", boostFactor)}x (${totalBoosts} procesados)"
                     }
-                    
+
                     applyStatusWithTtl()
                 }
                 "com.d4vram.whatsmicfix.DIAG_EVENT" -> {
@@ -88,27 +107,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_settings)
+    super.onCreate(savedInstanceState)
+    setContentView(R.layout.activity_settings)
 
-        Prefs.reloadIfStale(this)
-        
-        // Valores iniciales con 8dB como pediste
-        if (Prefs.boostDb <= 0f || Prefs.boostDb > 12f) {
-            Prefs.saveFromUi(this, true, 8.0f, false) // +8dB por defecto
-            Prefs.saveAdvancedToggles(this, preboost = true)
-            makePrefsWorldReadable()
-            Prefs.reloadIfStale(this)
-        }
+    // 1) Cargamos prefs actuales
+    Prefs.reloadIfStale(this)
 
-        initializeViews()
-        setupListeners()
-        loadCurrentSettings()
+    // 2) Solo si es PRIMER ARRANQUE, ponemos defaults
+    val sp = getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
+    val firstRun = !sp.contains(Prefs.KEY_ENABLE)
+    if (firstRun) {
+        Prefs.saveFromUi(this, enable = true, db = 8.0f, adv = false)
+        Prefs.saveAdvancedToggles(this, preboost = true)
         makePrefsWorldReadable()
-
-        // Verificar estado inicial
-        sendToWa("com.d4vram.whatsmicfix.PING")
+        Prefs.reloadIfStale(this)
     }
+
+    initializeViews()
+    setupListeners()
+    loadCurrentSettings()
+    makePrefsWorldReadable()
+
+    sendToWa("com.d4vram.whatsmicfix.PING")
+}
+
 
     private fun initializeViews() {
         swEnable     = findViewById(R.id.swEnable)
@@ -190,36 +212,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onResume() {
-        super.onResume()
-        val filter = IntentFilter().apply {
-            addAction("com.d4vram.whatsmicfix.WFM_STATUS")
-            addAction("com.d4vram.whatsmicfix.DIAG_EVENT")
-        }
+    super.onResume()
+    val filter = IntentFilter().apply {
+        addAction("com.d4vram.whatsmicfix.WFM_STATUS")
+        addAction("com.d4vram.whatsmicfix.DIAG_EVENT")
+    }
+    if (!receiverRegistered) {
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(statusRx, filter, Context.RECEIVER_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(statusRx, filter)
         }
-        sendToWa("com.d4vram.whatsmicfix.PING")
+        receiverRegistered = true
     }
+    sendToWa("com.d4vram.whatsmicfix.PING")
+}
 
-    override fun onPause() {
-        super.onPause()
+override fun onPause() {
+    super.onPause()
+    // ⚠️ No cancelar la comprobación aquí.
+    // Mantén el receiver mientras haya check en curso.
+    if (!isCheckingFunctionality && receiverRegistered) {
         try { unregisterReceiver(statusRx) } catch (_: Throwable) {}
+        receiverRegistered = false
+    }
+}
 
-        if (isCheckingFunctionality) {
-            isCheckingFunctionality = false
-            checkTimeout?.let { handler.removeCallbacks(it) }
-            checkTimeout = null
-        }
+override fun onDestroy() {
+    super.onDestroy()
+    checkTimeout?.let { handler.removeCallbacks(it) }
+    if (receiverRegistered) {
+        try { unregisterReceiver(statusRx) } catch (_: Throwable) {}
+        receiverRegistered = false
     }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        checkTimeout?.let { handler.removeCallbacks(it) }
-        handler.removeCallbacksAndMessages(null)
-    }
+}
+
 
     private fun progressToFactor(p: Int) = p.coerceIn(50, 400) / 100f
     private fun factorToDb(f: Float): Float = (20f * log10(f.toDouble())).toFloat()
@@ -299,7 +327,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyStatusWithTtl() {
         val ageMs = System.currentTimeMillis() - lastTs
-        val effectiveActive = if (lastActive) true else (lastReason == "preboost" && ageMs in 0..8000)
+        val effectiveActive = if (lastActive) true else (recentPreboostAgeMs <= 8000)
 
         val color = when {
             effectiveActive -> 0xFF2ECC71.toInt() // Verde

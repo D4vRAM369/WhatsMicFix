@@ -27,7 +27,7 @@
 
         <!-- Opcional, tu pantalla de logs si la usas -->
         <activity
-            android:name=".DiagnosticActivity"
+            android:name=".DiagnosticsActivity"
             android:exported="false"
             android:label="Diagnostics" />
     </application>

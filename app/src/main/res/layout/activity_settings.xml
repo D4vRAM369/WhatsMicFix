@@ -2,48 +2,21 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#111316">
+    android:background="#111316"
+    android:fillViewport="true">
 
+    <!-- Único hijo del ScrollView -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical">
-
-        <!-- Fila de estado -->
-        <LinearLayout
-            android:id="@+id/statusRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <View
-                android:id="@+id/statusDot"
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:background="@drawable/status_dot"
-                android:layout_marginEnd="10dp"/>
-
-            <TextView
-                android:id="@+id/statusText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sin señal"
-                android:textSize="14sp"
-                android:textColor="#FFFFFF"/>
-        </LinearLayout>
-
 
         <!-- Contenido principal -->
         <LinearLayout
-            android:orientation="vertical"
-            android:padding="20dp"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
 
             <TextView
                 android:id="@+id/tvTitle"
@@ -70,20 +43,21 @@
                 android:text="Ganancia: x1.35 (+2.6 dB)"
                 android:textColor="#B0BEC5" />
 
+            <!-- SeekBar: rango 0.5x..4.0x, ejemplo de posición x2.20 -->
             <SeekBar
                 android:id="@+id/seekBoost"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:max="250"
-                android:progress="135" />
+                android:max="400"
+                android:progress="220" />
 
             <TextView
                 android:id="@+id/tvRangeInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Rango: 0.5× … 2.5×   (si distorsiona, baja el deslizador)"
+                android:text="Rango: 0.5× … 4.0×   (si distorsiona, baja el deslizador)"
                 android:textColor="#8FA3AD" />
 
             <TextView
@@ -122,16 +96,50 @@
                 android:layout_height="wrap_content"
                 android:text="Habilitar supresor de ruido"
                 android:textColor="#FFFFFF" />
-
         </LinearLayout>
 
-        <!-- Botón de comprobación al final -->
+        <!-- Empuja lo de abajo al fondo -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Fila de estado (abajo) -->
+        <LinearLayout
+            android:id="@+id/statusRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/statusDot"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/status_dot"
+                android:layout_marginEnd="10dp" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sin señal"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
+        <!-- Botón abajo del todo -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="24dp"
+            android:paddingTop="8dp"
             android:paddingBottom="20dp"
             android:gravity="center">
 
@@ -142,7 +150,8 @@
                 android:text="COMPROBAR FUNCIONAMIENTO"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:backgroundTint="#2196F3"/>
+                android:backgroundTint="#2196F3" />
         </LinearLayout>
+
     </LinearLayout>
 </ScrollView>
