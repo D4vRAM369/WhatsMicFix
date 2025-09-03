@@ -61,6 +61,7 @@ object AudioHooks {
         hookReadByteBuffer()
         hookMediaRecorderMethods()
         hookAlternativeAudioMethods()
+        hookUniversalAudioRecordRead()
         hookRelease()
         hookReadFloat()
         hookSystemAudioServices(lpparam)
@@ -699,6 +700,76 @@ object AudioHooks {
             )
         } catch (t: Throwable) {
             Logx.e("Error marking audio active", t)
+        }
+    }
+
+    private fun hookUniversalAudioRecordRead() {
+        try {
+            // Hook usando reflexión para interceptar TODOS los métodos read de AudioRecord
+            val audioRecordClass = AudioRecord::class.java
+            val readMethods = audioRecordClass.declaredMethods.filter { it.name == "read" }
+            
+            Logx.d("Found ${readMethods.size} read methods in AudioRecord class")
+            
+            for (method in readMethods) {
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        audioRecordClass,
+                        method.name,
+                        *method.parameterTypes,
+                        object : XC_MethodHook() {
+                            override fun afterHookedMethod(p: MethodHookParam) {
+                                val result = p.result
+                                val paramTypes = method.parameterTypes.map { it.simpleName }.joinToString(", ")
+                                
+                                Logx.d("UNIVERSAL: AudioRecord.read($paramTypes) called -> result=$result")
+                                
+                                if (result is Int && result > 0) {
+                                    markAudioActive("AudioRecord.read($paramTypes)")
+                                    Logx.d("UNIVERSAL READ PROCESSING: $result samples with boost=${globalBoostFactor}x")
+                                    
+                                    // Si es ShortArray, aplicar boost
+                                    if (method.parameterTypes.any { it == ShortArray::class.java }) {
+                                        val ar = p.thisObject as AudioRecord
+                                        if (Prefs.moduleEnabled && Prefs.enablePreboost && isPcm16[ar] == true) {
+                                            val buf = p.args.find { it is ShortArray } as? ShortArray
+                                            val offset = (p.args.find { it is Int && it != result } as? Int) ?: 0
+                                            
+                                            if (buf != null) {
+                                                applyPreBoostShortArray(buf, offset, result)
+                                                Logx.d("UNIVERSAL: Applied pre-boost to ${result} samples!")
+                                                totalPreBoostsApplied++
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    )
+                    Logx.d("Successfully hooked AudioRecord.read(${method.parameterTypes.map { it.simpleName }.joinToString(", ")})")
+                } catch (t: Throwable) {
+                    Logx.w("Failed to hook read method: ${method.parameterTypes.map { it.simpleName }}")
+                }
+            }
+        } catch (t: Throwable) {
+            Logx.e("Error setting up universal AudioRecord read hooks", t)
+        }
+    }
+
+    private fun applyPreBoostShortArray(buf: ShortArray, offset: Int, count: Int) {
+        val end = kotlin.math.min(offset + count, buf.size)
+        for (i in offset until end) {
+            val sample = buf[i].toFloat() / Short.MAX_VALUE
+            val boosted = sample * globalBoostFactor
+            val compressed = boosted * 0.95f
+            val final = if (kotlin.math.abs(compressed) > 0.95f) {
+                0.95f * kotlin.math.tanh(compressed / 0.95f)
+            } else {
+                compressed
+            }
+            buf[i] = (final * Short.MAX_VALUE).toInt()
+                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                .toShort()
         }
     }
 }
