@@ -20,7 +20,7 @@
                 android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="WhatsMicFix 1.3-stable"
+                android:text="@string/app_name_description"
                 android:textStyle="bold"
                 android:textSize="20sp"
                 android:textColor="#FFFFFF" />
@@ -30,7 +30,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Activar pre-boost"
+                android:text="@string/enable_preboost"
                 android:textColor="#FFFFFF" />
 
             <TextView
@@ -54,14 +54,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Rango: 0.5× … 4.0×   (si distorsiona, baja el deslizador)"
+                android:text="@string/boost_range_info"
                 android:textColor="#8FA3AD" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:text="Opciones de estabilidad"
+                android:text="@string/stability_options"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF" />
 
@@ -70,14 +70,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="Respetar formato que pida la app (recomendado)"
+                android:text="@string/respect_app_format"
                 android:textColor="#FFFFFF" />
 
             <Switch
                 android:id="@+id/swForceMic"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Forzar fuente = MIC (solo si el micro no cambia)"
+                android:text="@string/force_mic_source"
                 android:textColor="#FFFFFF" />
 
             <Switch
@@ -91,7 +91,7 @@
                 android:id="@+id/swNs"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Habilitar supresor de ruido"
+                android:text="@string/enable_ns"
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
@@ -109,7 +109,7 @@
                 android:id="@+id/btnCheck"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="COMPROBAR FUNCIONAMIENTO"
+                android:text="@string/check_setup"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:backgroundTint="#2196F3"/>
@@ -138,7 +138,7 @@
                 android:id="@+id/statusText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sin señal"
+                android:text="@string/no_signal"
                 android:textSize="14sp"
                 android:textColor="#FFFFFF"/>
         </LinearLayout>
