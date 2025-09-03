@@ -21,13 +21,45 @@ object AppCtx {
 
 class HookEntry : IXposedHookLoadPackage {
 
-    private val targetPkgs = setOf("com.whatsapp", "com.whatsapp.w4b")
+    // Target UNIVERSAL - todos los procesos que usan audio + sistema
+    private val targetPkgs = setOf(
+        "com.whatsapp", "com.whatsapp.w4b",           // WhatsApp
+        "android",                                    // Sistema Android
+        "system_server",                              // Servidor del sistema
+        "com.android.server.telecom",                 // Telefonía
+        "media.audio",                                // Servicios de audio
+        "audioserver"                                 // Servidor de audio
+    )
+
+    // Apps de audio populares para máxima cobertura
+    private val audioApps = setOf(
+        "com.google.android.apps.recorder",           // Grabadora Google
+        "com.samsung.android.app.memo",
+        "com.sec.android.app.voicenote",
+        "com.android.soundrecorder",                  // AOSP
+        "org.telegram.messenger",
+        "com.facebook.orca",                          // Messenger
+        "us.zoom.videomeetings",
+        "com.skype.raider",
+        "com.discord"
+    )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (!targetPkgs.contains(lpparam.packageName)) return
-        Logx.d("Cargando hooks en ${lpparam.packageName}")
+        val pkg = lpparam.packageName
 
-        // Hook temprano para capturar Context y registrar receptores
+        // Hook UNIVERSAL: apps de audio o sistema
+        if (!targetPkgs.contains(pkg) && !audioApps.contains(pkg) && !isAudioRelated(pkg)) return
+        Logx.d("Cargando hooks UNIVERSALES en $pkg")
+
+        installUniversalHooks(lpparam)
+    }
+
+    private fun isAudioRelated(pkg: String): Boolean {
+        val audioKeywords = listOf("audio", "record", "voice", "sound", "call", "phone", "media")
+        return audioKeywords.any { pkg.contains(it, ignoreCase = true) }
+    }
+
+    private fun installUniversalHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
         XposedHelpers.findAndHookMethod(
             "android.app.Application",
             lpparam.classLoader,
@@ -38,15 +70,14 @@ class HookEntry : IXposedHookLoadPackage {
                     try {
                         val ctx = param.args[0] as? Context ?: return
                         AppCtx.set(ctx)
-                        Logx.d("Application.attach capturado; ctx establecido para ${ctx.packageName}")
+                        Logx.d("Application.attach capturado; ctx=${ctx.packageName}")
 
-                        // Verificación de integridad del contexto
                         if (ctx.packageName == null || ctx.applicationContext == null) {
-                            Logx.w("Contexto parece inválido: pkg=${ctx.packageName}")
+                            Logx.w("Contexto inválido: pkg=${ctx.packageName}")
                             return
                         }
 
-                        // 🔔 Canario: avisa a tu app que el hook está vivo en este proceso
+                        // Canario -> tu app
                         try {
                             ctx.sendBroadcast(
                                 Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
@@ -55,12 +86,11 @@ class HookEntry : IXposedHookLoadPackage {
                                     .putExtra("hookVersion", "1.3-stable")
                                     .putExtra("timestamp", System.currentTimeMillis())
                             )
-                            Logx.d("Canario enviado exitosamente")
                         } catch (t: Throwable) {
                             Logx.e("Error enviando canario", t)
                         }
 
-                        // RELOAD - Con manejo mejorado de errores
+                        // RELOAD
                         try {
                             val filter = IntentFilter("com.d4vram.whatsmicfix.RELOAD")
                             val reloadReceiver = object : BroadcastReceiver() {
@@ -69,8 +99,6 @@ class HookEntry : IXposedHookLoadPackage {
                                         if (i?.action == "com.d4vram.whatsmicfix.RELOAD") {
                                             Prefs.forceReload()
                                             Logx.d("RELOAD recibido; invalidado TTL de prefs")
-                                            
-                                            // Confirmar recepción
                                             c?.sendBroadcast(
                                                 Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
                                                     .setPackage(APP_PKG)
@@ -82,29 +110,25 @@ class HookEntry : IXposedHookLoadPackage {
                                     }
                                 }
                             }
-                            
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
                                 ctx.registerReceiver(reloadReceiver, filter, Context.RECEIVER_EXPORTED)
                             } else {
                                 @Suppress("UnspecifiedRegisterReceiverFlag")
                                 ctx.registerReceiver(reloadReceiver, filter)
                             }
-                            Logx.d("Receiver RELOAD registrado exitosamente")
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver RELOAD", t)
                         }
 
-                        // PING - Con confirmación de respuesta
+                        // PING
                         try {
                             val filter = IntentFilter("com.d4vram.whatsmicfix.PING")
                             val pingReceiver = object : BroadcastReceiver() {
                                 override fun onReceive(c: Context?, i: Intent?) {
                                     try {
                                         if (i?.action == "com.d4vram.whatsmicfix.PING") {
-                                            Logx.d("PING recibido, enviando respuesta")
+                                            Logx.d("PING recibido, enviando estado")
                                             AudioHooks.respondPing()
-                                            
-                                            // Confirmar que PING fue procesado
                                             c?.sendBroadcast(
                                                 Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
                                                     .setPackage(APP_PKG)
@@ -116,18 +140,16 @@ class HookEntry : IXposedHookLoadPackage {
                                     }
                                 }
                             }
-                            
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
                                 ctx.registerReceiver(pingReceiver, filter, Context.RECEIVER_EXPORTED)
                             } else {
                                 @Suppress("UnspecifiedRegisterReceiverFlag")
                                 ctx.registerReceiver(pingReceiver, filter)
                             }
-                            Logx.d("Receiver PING registrado exitosamente")
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver PING", t)
                         }
-                        
+
                     } catch (mainError: Throwable) {
                         Logx.e("Error crítico en Application.attach hook", mainError)
                     }
