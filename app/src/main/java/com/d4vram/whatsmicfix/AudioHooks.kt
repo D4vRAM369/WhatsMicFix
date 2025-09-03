@@ -59,6 +59,8 @@ object AudioHooks {
         hookReadShort()
         hookReadByte()
         hookReadByteBuffer()
+        hookMediaRecorderMethods()
+        hookAlternativeAudioMethods()
         hookRelease()
         hookReadFloat()
         hookSystemAudioServices(lpparam)
@@ -574,5 +576,129 @@ object AudioHooks {
             i += 2
         }
         bb.order(saved)
+    }
+
+    private fun hookMediaRecorderMethods() {
+        try {
+            // Hook MediaRecorder.start() - Muchas apps usan esto en lugar de AudioRecord
+            XposedHelpers.findAndHookMethod(
+                "android.media.MediaRecorder",
+                null,
+                "start",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(p: MethodHookParam) {
+                        Logx.d("MediaRecorder.start() CALLED - starting recording")
+                        markAudioActive("MediaRecorder.start()")
+                    }
+                }
+            )
+
+            // Hook MediaRecorder.prepare()
+            XposedHelpers.findAndHookMethod(
+                "android.media.MediaRecorder",
+                null,
+                "prepare",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        Logx.d("MediaRecorder.prepare() CALLED")
+                    }
+                }
+            )
+
+            // Hook MediaRecorder.setAudioSource()
+            XposedHelpers.findAndHookMethod(
+                "android.media.MediaRecorder",
+                null,
+                "setAudioSource",
+                Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        val source = p.args[0] as Int
+                        Logx.d("MediaRecorder.setAudioSource($source) CALLED")
+                        if (source == 1) { // MediaRecorder.AudioSource.MIC
+                            Logx.d("MediaRecorder using MICROPHONE source - this is what we want to intercept!")
+                        }
+                    }
+                }
+            )
+        } catch (t: Throwable) {
+            Logx.e("Error hooking MediaRecorder methods", t)
+        }
+    }
+
+    private fun hookAlternativeAudioMethods() {
+        try {
+            // Hook AudioRecord métodos alternativos que WhatsApp podría usar
+            
+            // AudioRecord.read con diferentes parámetros
+            XposedHelpers.findAndHookMethod(
+                AudioRecord::class.java,
+                "read",
+                FloatArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        val count = (p.result as? Int) ?: return
+                        Logx.d("read(FloatArray) called, returned $count - PROCESSING with boost=${globalBoostFactor}x")
+                        if (count > 0) markAudioActive("AudioRecord.read(FloatArray)")
+                    }
+                }
+            )
+
+            // Hook AudioRecord.getMinBufferSize - se llama antes de grabar
+            XposedHelpers.findAndHookMethod(
+                AudioRecord::class.java,
+                "getMinBufferSize",
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(p: MethodHookParam) {
+                        val sr = p.args[0] as Int
+                        val ch = p.args[1] as Int
+                        val fmt = p.args[2] as Int
+                        Logx.d("AudioRecord.getMinBufferSize(sr=$sr, ch=$ch, fmt=$fmt) - preparing for recording")
+                    }
+                }
+            )
+
+            // Hook AudioTrack methods que pueden estar involucrados
+            XposedHelpers.findAndHookMethod(
+                "android.media.AudioTrack",
+                null,
+                "write",
+                ShortArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(p: MethodHookParam) {
+                        val count = p.args[2] as Int
+                        if (count > 0) {
+                            Logx.d("AudioTrack.write(ShortArray, $count) - audio playback detected")
+                            markAudioActive("AudioTrack.write()")
+                        }
+                    }
+                }
+            )
+
+        } catch (t: Throwable) {
+            Logx.e("Error hooking alternative audio methods", t)
+        }
+    }
+
+    private fun markAudioActive(source: String) {
+        try {
+            lastActive = true
+            lastReason = source
+            lastTs = System.currentTimeMillis()
+            Logx.d("AUDIO ACTIVITY DETECTED from: $source")
+            
+            // Enviar broadcast inmediato para notificar detección
+            AppCtx.get()?.sendBroadcast(
+                Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                    .setPackage(APP_PKG)
+                    .putExtra("active", true)
+                    .putExtra("reason", source)
+                    .putExtra("ts", lastTs)
+                    .putExtra("boostFactor", globalBoostFactor)
+            )
+        } catch (t: Throwable) {
+            Logx.e("Error marking audio active", t)
+        }
     }
 }
