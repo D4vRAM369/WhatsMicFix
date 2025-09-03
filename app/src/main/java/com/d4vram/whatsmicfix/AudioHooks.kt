@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.max
 import kotlin.math.abs
-import kotlin.math.sqrt
 import kotlin.math.tanh
 
 private const val APP_PKG = "com.d4vram.whatsmicfix"
@@ -25,7 +24,6 @@ object AudioHooks {
     private const val SR_FALLBACK = 44100
     private const val SR_HIGH = 48000
 
-    // Procesamiento profesional con compresión dinámica
     private const val COMPRESSION_RATIO = 4.0f
     private const val COMPRESSION_THRESHOLD = 0.7f
     private const val ATTACK_TIME = 0.005f
@@ -34,14 +32,13 @@ object AudioHooks {
 
     private val isPcm16 = WeakHashMap<AudioRecord, Boolean>()
     private val fxBySession = ConcurrentHashMap<Int, Pair<AutomaticGainControl?, NoiseSuppressor?>>()
-
     private val compressorStates = ConcurrentHashMap<AudioRecord, CompressorState>()
     private val lookaheadBuffers = ConcurrentHashMap<AudioRecord, FloatArray>()
 
     @Volatile private var lastActive = false
     @Volatile private var lastReason = "init"
     @Volatile private var lastTs = 0L
-    @Volatile private var globalBoostFactor = 4.0f // 4x = 12dB boost inicial
+    @Volatile private var globalBoostFactor = 4.0f
 
     private var totalAudioRecordsHooked = 0
     private var totalPreBoostsApplied = 0
@@ -56,7 +53,6 @@ object AudioHooks {
 
     fun install(lpparam: XC_LoadPackage.LoadPackageParam) {
         updateGlobalBoostFactor()
-
         hookAudioRecordCtor()
         hookAudioRecordBuilder(lpparam)
         hookStartRecording()
@@ -64,8 +60,8 @@ object AudioHooks {
         hookReadByte()
         hookReadByteBuffer()
         hookRelease()
+        hookReadFloat()
         hookSystemAudioServices(lpparam)
-
         if (lpparam.packageName.contains("whatsapp")) {
             Logx.d("Hooks instalados en ${lpparam.packageName} - Boost: ${globalBoostFactor}x")
         }
@@ -74,11 +70,9 @@ object AudioHooks {
     private fun updateGlobalBoostFactor() {
         try {
             Prefs.reloadIfStale(100)
-            globalBoostFactor = if (Prefs.moduleEnabled && Prefs.enablePreboost) {
+            globalBoostFactor = if (Prefs.moduleEnabled && Prefs.enablePreboost)
                 min(maxOf(Prefs.boostFactor, 1.0f), 4.0f)
-            } else {
-                1.0f
-            }
+            else 1.0f
             Logx.d("Boost factor actualizado: ${globalBoostFactor}x")
         } catch (t: Throwable) {
             globalBoostFactor = 4.0f
@@ -88,38 +82,27 @@ object AudioHooks {
 
     private fun hookSystemAudioServices(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
-            XposedHelpers.findAndHookConstructor(
-                MediaRecorder::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        totalAudioRecordsHooked++
-                    }
-                }
-            )
+            XposedHelpers.findAndHookConstructor(MediaRecorder::class.java, object : XC_MethodHook() {
+                override fun afterHookedMethod(p: MethodHookParam) { totalAudioRecordsHooked++ }
+            })
         } catch (_: Throwable) {}
     }
 
     private fun emitStatus(active: Boolean, reason: String, ar: AudioRecord?, sid: Int) {
-        lastActive = active
-        lastReason = reason
-        lastTs = System.currentTimeMillis()
-
+        lastActive = active; lastReason = reason; lastTs = System.currentTimeMillis()
         try {
-            val ctx = AppCtx.get()
-            if (ctx != null) {
-                ctx.sendBroadcast(
-                    Intent("com.d4vram.whatsmicfix.WFM_STATUS")
-                        .setPackage(APP_PKG)
-                        .putExtra("active", active)
-                        .putExtra("reason", reason)
-                        .putExtra("sid", sid)
-                        .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
-                        .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
-                        .putExtra("ts", lastTs)
-                        .putExtra("boostFactor", globalBoostFactor)
-                        .putExtra("totalBoosts", totalPreBoostsApplied) // <-- añadido
-                )
-            }
+            AppCtx.get()?.sendBroadcast(
+                Intent("com.d4vram.whatsmicfix.WFM_STATUS")
+                    .setPackage(APP_PKG)
+                    .putExtra("active", active)
+                    .putExtra("reason", reason)
+                    .putExtra("sid", sid)
+                    .putExtra("sr", try { ar?.sampleRate ?: -1 } catch (_: Throwable) { -1 })
+                    .putExtra("enc", try { ar?.audioFormat ?: -1 } catch (_: Throwable) { -1 })
+                    .putExtra("ts", lastTs)
+                    .putExtra("boostFactor", globalBoostFactor)
+                    .putExtra("totalBoosts", totalPreBoostsApplied) // <-- añadido
+            )
         } catch (t: Throwable) {
             Logx.w("Error en emitStatus: ${t.message}")
         }
@@ -220,8 +203,8 @@ object AudioHooks {
     }
 
     private fun initCompressorForRecord(ar: AudioRecord, sampleRate: Int) {
-        val attackSamples = (ATTACK_TIME * sampleRate).toInt()
-        val releaseSamples = (RELEASE_TIME * sampleRate).toInt()
+        val attackSamples = (ATTACK_TIME * sampleRate).toInt().coerceAtLeast(1)
+        val releaseSamples = (RELEASE_TIME * sampleRate).toInt().coerceAtLeast(1)
 
         compressorStates[ar] = CompressorState(
             envelope = 0f,
@@ -378,7 +361,6 @@ object AudioHooks {
 
                     processWithCompressor(buf, off, len, globalBoostFactor, ar)
                     totalPreBoostsApplied++
-
                     val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                     emitStatus(true, "preboost", ar, sid)
                 }
@@ -405,7 +387,6 @@ object AudioHooks {
 
                     processBytesWithCompressor(buf, off, len, globalBoostFactor, ar)
                     totalPreBoostsApplied++
-
                     val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                     emitStatus(true, "preboost", ar, sid)
                 }
@@ -432,7 +413,6 @@ object AudioHooks {
 
                         processByteBufferWithCompressor(bb, valid, globalBoostFactor, ar)
                         totalPreBoostsApplied++
-
                         val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
                         emitStatus(true, "preboost", ar, sid)
                     }
@@ -443,26 +423,61 @@ object AudioHooks {
         }
     }
 
-    // --- Procesamiento con compresor dinámico ---
+    private fun hookReadFloat() {
+        try {
+            XposedHelpers.findAndHookMethod(
+                AudioRecord::class.java, "read",
+                FloatArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        val count = (p.result as? Int) ?: return
+                        if (count <= 0) return
+
+                        val ar = p.thisObject as AudioRecord
+                        Prefs.reloadIfStale(500)
+                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
+
+                        val buf = p.args[0] as FloatArray
+                        val off = p.args[1] as Int
+                        val len = kotlin.math.min(count, buf.size - off)
+                        if (len <= 0) return
+
+                        // Procesado en float (boost + compresión + soft-clip)
+                        val boost = kotlin.math.min(kotlin.math.max(Prefs.boostFactor, 1.0f), 4.0f)
+                        val end = off + len
+                        var i = off
+                        while (i < end) {
+                            var x = buf[i] * boost
+                            // compresión suave: limita >0.95 de forma no lineal
+                            x = if (kotlin.math.abs(x) > 0.95f) 0.95f * kotlin.math.tanh(x / 0.95f) else x
+                            buf[i] = x
+                            i++
+                        }
+
+                        totalPreBoostsApplied++
+                        val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
+                        emitStatus(true, "preboost", ar, sid)
+                    }
+                }
+            )
+        } catch (_: Throwable) { /* en algunos OEM no existe la sobrecarga float */ }
+    }
+
+    // --- Procesamiento (boost + compresor + soft clip) ---
 
     private fun processWithCompressor(buf: ShortArray, off: Int, len: Int, boost: Float, ar: AudioRecord) {
         val state = compressorStates[ar] ?: return
-        val lookahead = lookaheadBuffers[ar] ?: return
-
         val end = off + len
         var i = off
-
         while (i < end) {
             val input = buf[i].toFloat() / Short.MAX_VALUE
             val boosted = input * boost
             val level = abs(boosted)
 
-            if (level > state.envelope) {
-                state.envelope += (level - state.envelope) * state.attackCoeff
-            } else {
-                state.envelope += (level - state.envelope) * state.releaseCoeff
-            }
+            // envelope
+            state.envelope += ((if (level > state.envelope) ATTACK_TIME else RELEASE_TIME) * (level - state.envelope))
 
+            // ganancia target
             val targetGain = if (state.envelope > COMPRESSION_THRESHOLD) {
                 val excess = state.envelope - COMPRESSION_THRESHOLD
                 val compressedExcess = excess / COMPRESSION_RATIO
@@ -472,24 +487,17 @@ object AudioHooks {
             state.gain += (targetGain - state.gain) * 0.1f
 
             val compressed = boosted * state.gain
-            val output = if (abs(compressed) > 0.95f) {
-                0.95f * tanh(compressed / 0.95f)
-            } else compressed
+            val out = if (abs(compressed) > 0.95f) 0.95f * tanh(compressed / 0.95f) else compressed
 
-            buf[i] = (output * Short.MAX_VALUE).toInt().coerceIn(
-                Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()
-            ).toShort()
-
+            buf[i] = (out * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
             i++
         }
     }
 
     private fun processBytesWithCompressor(buf: ByteArray, off: Int, len: Int, boost: Float, ar: AudioRecord) {
         val state = compressorStates[ar] ?: return
-
         val end = off + len - 1
         var i = off
-
         while (i < end) {
             val lo = buf[i].toInt() and 0xFF
             val hi = buf[i + 1].toInt()
@@ -499,11 +507,7 @@ object AudioHooks {
             val boosted = input * boost
             val level = abs(boosted)
 
-            if (level > state.envelope) {
-                state.envelope += (level - state.envelope) * state.attackCoeff
-            } else {
-                state.envelope += (level - state.envelope) * state.releaseCoeff
-            }
+            state.envelope += ((if (level > state.envelope) ATTACK_TIME else RELEASE_TIME) * (level - state.envelope))
 
             val targetGain = if (state.envelope > COMPRESSION_THRESHOLD) {
                 val excess = state.envelope - COMPRESSION_THRESHOLD
@@ -514,41 +518,29 @@ object AudioHooks {
             state.gain += (targetGain - state.gain) * 0.1f
 
             val compressed = boosted * state.gain
-            val output = if (abs(compressed) > 0.95f) {
-                0.95f * tanh(compressed / 0.95f)
-            } else compressed
+            val out = if (abs(compressed) > 0.95f) 0.95f * tanh(compressed / 0.95f) else compressed
 
-            val outputSample = (output * Short.MAX_VALUE).toInt().coerceIn(
-                Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()
-            ).toShort()
-
-            buf[i]     = (outputSample.toInt() and 0xFF).toByte()
-            buf[i + 1] = ((outputSample.toInt() shr 8) and 0xFF).toByte()
+            val outShort = (out * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            buf[i]     = (outShort.toInt() and 0xFF).toByte()
+            buf[i + 1] = ((outShort.toInt() shr 8) and 0xFF).toByte()
             i += 2
         }
     }
 
     private fun processByteBufferWithCompressor(bb: ByteBuffer, validBytes: Int, boost: Float, ar: AudioRecord) {
         val state = compressorStates[ar] ?: return
-
-        val savedOrder = bb.order()
+        val saved = bb.order()
         bb.order(ByteOrder.LITTLE_ENDIAN)
-
         val pos = bb.position()
         val lim = pos + validBytes
         var i = pos
-
         while (i + 1 < lim) {
             val sample = bb.getShort(i)
             val input = sample.toFloat() / Short.MAX_VALUE
             val boosted = input * boost
             val level = abs(boosted)
 
-            if (level > state.envelope) {
-                state.envelope += (level - state.envelope) * state.attackCoeff
-            } else {
-                state.envelope += (level - state.envelope) * state.releaseCoeff
-            }
+            state.envelope += ((if (level > state.envelope) ATTACK_TIME else RELEASE_TIME) * (level - state.envelope))
 
             val targetGain = if (state.envelope > COMPRESSION_THRESHOLD) {
                 val excess = state.envelope - COMPRESSION_THRESHOLD
@@ -559,17 +551,11 @@ object AudioHooks {
             state.gain += (targetGain - state.gain) * 0.1f
 
             val compressed = boosted * state.gain
-            val output = if (abs(compressed) > 0.95f) {
-                0.95f * tanh(compressed / 0.95f)
-            } else compressed
+            val out = if (abs(compressed) > 0.95f) 0.95f * tanh(compressed / 0.95f) else compressed
 
-            bb.putShort(i, (output * Short.MAX_VALUE).toInt().coerceIn(
-                Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()
-            ).toShort())
-
+            bb.putShort(i, (out * Short.MAX_VALUE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort())
             i += 2
         }
-
-        bb.order(savedOrder)
+        bb.order(saved)
     }
 }

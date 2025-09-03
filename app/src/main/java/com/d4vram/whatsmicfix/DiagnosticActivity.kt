@@ -15,7 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
-class DiagnosticsActivity : AppCompatActivity() {
+class DiagnosticActivity : AppCompatActivity() {
 
     private lateinit var tv: TextView
     private val log = StringBuilder(1024)

@@ -17,7 +17,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="WhatsMicFix">
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -28,7 +28,7 @@
         <activity
             android:name=".DiagnosticActivity"
             android:exported="false"
-            android:label="Diagnostics" />
+            android:label="Diagnostic" />
     </application>
 
 </manifest>
