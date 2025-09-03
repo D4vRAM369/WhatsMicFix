@@ -106,8 +106,8 @@ class MainActivity : AppCompatActivity() {
 
         initializeViews()
         ensureStatusDotBg()
-        setupListeners()
         loadCurrentSettings()
+        setupListeners()
         Prefs.makePrefsWorldReadable(this)
 
         // PING opcional (ya no es necesario para el check universal, pero mantiene diagnóstico)

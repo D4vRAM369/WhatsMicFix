@@ -72,14 +72,12 @@ class HookEntry : IXposedHookLoadPackage {
                         AppCtx.set(ctx)
                         Logx.d("Application.attach capturado; ctx=${ctx.packageName}")
 
-                        if (ctx.packageName == null || ctx.applicationContext == null) {
-                            Logx.w("Contexto inválido: pkg=${ctx.packageName}")
-                            return
-                        }
+                        // Usar el contexto que tengamos disponible
+                        val workingCtx = ctx.applicationContext ?: ctx
 
                         // Canario -> tu app
                         try {
-                            ctx.sendBroadcast(
+                            workingCtx.sendBroadcast(
                                 Intent("com.d4vram.whatsmicfix.DIAG_EVENT")
                                     .setPackage(APP_PKG)
                                     .putExtra("msg", "Hook activo en ${ctx.packageName}")
@@ -111,10 +109,10 @@ class HookEntry : IXposedHookLoadPackage {
                                 }
                             }
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                ctx.registerReceiver(reloadReceiver, filter, Context.RECEIVER_EXPORTED)
+                                workingCtx.registerReceiver(reloadReceiver, filter, Context.RECEIVER_EXPORTED)
                             } else {
                                 @Suppress("UnspecifiedRegisterReceiverFlag")
-                                ctx.registerReceiver(reloadReceiver, filter)
+                                workingCtx.registerReceiver(reloadReceiver, filter)
                             }
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver RELOAD", t)
@@ -141,10 +139,10 @@ class HookEntry : IXposedHookLoadPackage {
                                 }
                             }
                             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                ctx.registerReceiver(pingReceiver, filter, Context.RECEIVER_EXPORTED)
+                                workingCtx.registerReceiver(pingReceiver, filter, Context.RECEIVER_EXPORTED)
                             } else {
                                 @Suppress("UnspecifiedRegisterReceiverFlag")
-                                ctx.registerReceiver(pingReceiver, filter)
+                                workingCtx.registerReceiver(pingReceiver, filter)
                             }
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver PING", t)

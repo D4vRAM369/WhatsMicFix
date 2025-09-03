@@ -41,9 +41,9 @@ object Prefs {
 
     /** NUEVO: detectar primera ejecución real (sin pisar prefs). */
     fun prefsFileExists(ctx: Context): Boolean {
-    val f = java.io.File(ctx.applicationInfo.dataDir + "/shared_prefs/${Prefs.FILE}.xml")
-    return f.exists()
-}
+        val f = java.io.File(ctx.applicationInfo.dataDir + "/shared_prefs/${Prefs.FILE}.xml")
+        return f.exists()
+    }
 
 
     fun makePrefsWorldReadable(ctx: Context) {

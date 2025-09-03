@@ -297,13 +297,25 @@ object AudioHooks {
 
     private fun hookStartRecording() {
         XposedHelpers.findAndHookMethod(AudioRecord::class.java, "startRecording", object : XC_MethodHook() {
+            override fun beforeHookedMethod(p: MethodHookParam) {
+                Logx.d("startRecording() CALLED - about to start recording")
+            }
+            
             override fun afterHookedMethod(p: MethodHookParam) {
+                Logx.d("startRecording() COMPLETED")
                 Prefs.reloadIfStale(500)
-                if (!Prefs.moduleEnabled) return
+                if (!Prefs.moduleEnabled) {
+                    Logx.d("startRecording: module disabled")
+                    return
+                }
 
                 val ar = p.thisObject as AudioRecord
                 val sid = try { ar.audioSessionId } catch (_: Throwable) { -1 }
-                if (sid <= 0) return
+                Logx.d("startRecording: sessionId=$sid")
+                if (sid <= 0) {
+                    Logx.d("startRecording: invalid sessionId, skipping")
+                    return
+                }
 
                 if (!fxBySession.containsKey(sid)) {
                     val agc = if (Prefs.enableAgc && AutomaticGainControl.isAvailable()) {
@@ -349,10 +361,15 @@ object AudioHooks {
             object : XC_MethodHook() {
                 override fun afterHookedMethod(p: MethodHookParam) {
                     val count = (p.result as? Int) ?: return
+                    Logx.d("read(ShortArray) called, returned $count bytes")
                     if (count <= 0) return
 
                     val ar = p.thisObject as AudioRecord
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) {
+                        Logx.d("read(ShortArray): skipping processing - enabled=${Prefs.moduleEnabled}, preboost=${Prefs.enablePreboost}, pcm16=${isPcm16[ar]}")
+                        return
+                    }
+                    Logx.d("read(ShortArray): PROCESSING AUDIO with boost=${globalBoostFactor}x")
 
                     val buf = p.args[0] as ShortArray
                     val off = p.args[1] as Int
