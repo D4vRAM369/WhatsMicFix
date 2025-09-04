@@ -1,4 +1,4 @@
-# WhatsMicFix (LSPosed Module)
+# WhatsMicFix v1.3-stable (LSPosed Module)
 
 <img width="512" height="512" alt="WhatsMicFix_Logo" src="https://github.com/user-attachments/assets/2394432f-e0d2-456e-8edd-fbe5f5cbe2e1" />
 
@@ -11,6 +11,33 @@ Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales
 - Probado en dispositivos recientes (ej. Pixel 8 con Android 16).  
 - El efecto es **perceptible y notable** tras reiniciar WhatsApp con los parámetros ajustados.  
 - La estabilidad puede variar dependiendo de cómo WhatsApp maneje internamente `AudioRecord`.
+=======
+Mejora la **calidad y el nivel** del audio enviado por WhatsApp cuando el micrófono queda por debajo de lo esperado. Incluye **pre-boost avanzado con compresión inteligente** para evitar distorsión.
+
+## ✨ Nuevo en v1.3
+- **Rango extendido**: 0.5× a 4.0× (vs 0.5× a 2.5× en v1.2)
+- **Compresión dinámica**: Previene automáticamente la distorsión en boosts altos
+- **Soft limiting**: Suaviza los picos para audio más natural
+- **Estabilidad mejorada**: Menos necesidad de forzar detención de WhatsApp
+- **Sistema de recarga**: Cambios de configuración se aplican automáticamente
+
+## Estado
+Probado en **Pixel 8 (Android 16)**: la v1.3 ofrece **mayor estabilidad y calidad** que la v1.2. El sistema de compresión permite usar boosts altos (hasta 4.0×) sin distorsión audible.
+
+## Uso
+1. Instala el APK como **módulo LSPosed** y habilítalo para **WhatsApp**.
+2. Abre **WhatsMicFix** y activa **Pre-Boost**.
+3. Ajusta la **ganancia** usando el deslizador (recomendado: 1.5× - 3.0×).
+4. **Opcional**: **Ajustes del sistema → Apps → WhatsApp → Forzar detención** (menos necesario en v1.3).
+5. Abre WhatsApp y graba un audio.
+
+> *Nota:* La v1.3 aplica cambios automáticamente, pero forzar detención garantiza la aplicación completa de nuevos ajustes.
+
+## Configuración Avanzada
+- **Respetar formato**: Mantiene la configuración de audio solicitada por WhatsApp (recomendado)
+- **Forzar fuente MIC**: Solo activar si el micrófono no cambia durante la grabación
+- **AGC/Supresor de ruido**: Mejoras adicionales de calidad de audio
+>>>>>>> e49b65f (docs: update README for v1.3-stable release)
 
 ---
 
