@@ -37,7 +37,6 @@ Probado en **Pixel 8 (Android 16)**: la v1.3 ofrece **mayor estabilidad y calida
 - **Respetar formato**: Mantiene la configuración de audio solicitada por WhatsApp (recomendado)
 - **Forzar fuente MIC**: Solo activar si el micrófono no cambia durante la grabación
 - **AGC/Supresor de ruido**: Mejoras adicionales de calidad de audio
->>>>>>> e49b65f (docs: update README for v1.3-stable release)
 
 ---
 
