@@ -24,11 +24,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Opcional, tu pantalla de logs si la usas -->
-        <activity
-            android:name=".DiagnosticActivity"
-            android:exported="false"
-            android:label="Diagnostic" />
     </application>
 
 </manifest>

@@ -7,8 +7,6 @@
     <string name="stability_options">Opciones de estabilidad</string>
     <string name="respect_app_format">Respetar formato que pida la app (recomendado)</string>
     <string name="force_mic_source">Forzar fuente = MIC (solo si el micro no cambia)</string>
-    <string name="enable_agc_ns">Activar AGC/NS (A14–A16, mejora audios bajos)</string>
+    <string name="enable_agc">Habilitar AGC</string>
     <string name="enable_ns">Habilitar supresor de ruido</string>
-    <string name="check_setup">Comprobar configuración</string>
-    <string name="no_signal">Sin señal</string>
 </resources>
