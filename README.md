@@ -1,7 +1,3 @@
-Aquí tienes el bloque **listo para pegar** en tu README, mismo estilo/formato pero actualizado a **v1.3-stable** (rangos, scopes LSPosed, notas de estabilidad y flujo de uso sin duplicados):
-
----
-
 # WhatsMicFix v1.3-stable (LSPosed Module)
 
 <img width="512" height="512" alt="WhatsMicFix_Logo" src="https://github.com/user-attachments/assets/2394432f-e0d2-456e-8edd-fbe5f5cbe2e1" />
