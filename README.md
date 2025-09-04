@@ -2,6 +2,7 @@
 
 <img width="512" height="512" alt="WhatsMicFix_Logo" src="https://github.com/user-attachments/assets/2394432f-e0d2-456e-8edd-fbe5f5cbe2e1" />
 
+
 Mejora la **calidad y el nivel** del audio enviado por WhatsApp cuando el micrófono queda por debajo de lo esperado.  
 Permite aplicar una **ganancia configurable en dB** junto a funciones opcionales como **pre-boost**, **AGC (Control Automático de Ganancia)** y **supresión de ruido** _(AGC y NS mejoras de la versión 1.2)_.
 
