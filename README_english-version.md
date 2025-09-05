@@ -1,7 +1,3 @@
-Aquí tienes tu README en **inglés**, ya pulido y en **formato Markdown** listo para pegar en `README.md`. Al final te pongo los **comandos Git** para subirlo a GitHub.
-
----
-
 # WhatsMicFix v1.3-stable (LSPosed Module)
 
 <img width="512" height="512" alt="WhatsMicFix_Logo" src="https://github.com/user-attachments/assets/2394432f-e0d2-456e-8edd-fbe5f5cbe2e1" />
