@@ -1,22 +1,15 @@
 package com.d4vram.whatsmicfix
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
-import android.widget.Button
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import java.io.File
 import kotlin.math.log10
 import kotlin.math.pow
 
@@ -29,6 +22,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swAgc: Switch
     private lateinit var swNs: Switch
     private lateinit var swRespectFmt: Switch
+    private lateinit var btnBuyCoffee: View
+    private lateinit var btnGithubSupport: View
 
     private var distortionWarningShown = false
 
@@ -60,6 +55,8 @@ class MainActivity : AppCompatActivity() {
         swAgc        = findViewById(R.id.swAgc)
         swNs         = findViewById(R.id.swNs)
         swRespectFmt = findViewById(R.id.swRespectFmt)
+        btnBuyCoffee = findViewById(R.id.btnBuyCoffee)
+        btnGithubSupport = findViewById(R.id.btnGithubSupport)
     }
 
     private fun setupListeners() {
@@ -98,6 +95,13 @@ class MainActivity : AppCompatActivity() {
         swAgc.setOnCheckedChangeListener(toggleListener)
         swNs.setOnCheckedChangeListener(toggleListener)
         swRespectFmt.setOnCheckedChangeListener(toggleListener)
+
+        btnBuyCoffee.setOnClickListener {
+            openUrl("https://www.buymeacoffee.com/D4vRAM369")
+        }
+        btnGithubSupport.setOnClickListener {
+            openUrl("https://github.com/D4vRAM369/WhatsMicFix")
+        }
     }
 
     private fun loadCurrentSettings() {
@@ -113,19 +117,6 @@ class MainActivity : AppCompatActivity() {
 
         updateLabel(enabled, factor)
     }
-
-    override fun onResume() {
-        super.onResume()
-    }
-
-    override fun onPause() {
-        super.onPause()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }
-
 
     private fun progressToFactor(p: Int) = p.coerceIn(50, 400) / 100f
     private fun factorToDb(f: Float): Float = (20f * log10(f.toDouble())).toFloat()
@@ -164,6 +155,15 @@ class MainActivity : AppCompatActivity() {
             else -> android.graphics.Color.WHITE
         }
         tvFactor.setTextColor(color)
+    }
+
+    private fun openUrl(url: String) {
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        }.onFailure {
+            Toast.makeText(this, "No se pudo abrir el enlace.", Toast.LENGTH_SHORT).show()
+        }
     }
 
 }

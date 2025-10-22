@@ -12,7 +12,10 @@
         <!-- Contenido principal -->
         <LinearLayout
             android:orientation="vertical"
-            android:padding="20dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="28dp"
+            android:paddingTop="40dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
@@ -20,6 +23,7 @@
                 android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:text="@string/app_name_description"
                 android:textStyle="bold"
                 android:textSize="20sp"
@@ -93,6 +97,56 @@
                 android:layout_height="wrap_content"
                 android:text="@string/enable_ns"
                 android:textColor="#FFFFFF" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="28dp"
+                android:background="#222427" />
+
+            <TextView
+                android:id="@+id/tvSupportTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/support_section_title"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnGithubSupport"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_github_badge"
+                android:gravity="center"
+                android:minHeight="56dp"
+                android:padding="16dp"
+                android:text="@string/support_github_badge"
+                android:textColor="#F6F8FA"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground" />
+
+            <TextView
+                android:id="@+id/btnBuyCoffee"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_buy_coffee"
+                android:gravity="center"
+                android:minHeight="56dp"
+                android:padding="16dp"
+                android:text="@string/support_buy_coffee"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground" />
         </LinearLayout>
 
 

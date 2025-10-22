@@ -9,4 +9,7 @@
     <string name="force_mic_source">Forzar fuente = MIC (solo si el micro no cambia)</string>
     <string name="enable_agc">Habilitar AGC</string>
     <string name="enable_ns">Habilitar supresor de ruido</string>
+    <string name="support_section_title">Apoya el proyecto</string>
+    <string name="support_github_badge">Support this project if this helped you ⭐️</string>
+    <string name="support_buy_coffee">☕ Buy me a coffee</string>
 </resources>
