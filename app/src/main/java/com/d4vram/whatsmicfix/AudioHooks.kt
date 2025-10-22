@@ -10,7 +10,6 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.max
@@ -30,7 +29,7 @@ object AudioHooks {
     private const val RELEASE_TIME = 0.05f
     private const val LOOKAHEAD_SAMPLES = 64
 
-    private val isPcm16 = WeakHashMap<AudioRecord, Boolean>()
+    private val isPcm16 = ConcurrentHashMap<AudioRecord, Boolean>()
     private val fxBySession = ConcurrentHashMap<Int, Pair<AutomaticGainControl?, NoiseSuppressor?>>()
     private val compressorStates = ConcurrentHashMap<AudioRecord, CompressorState>()
     private val lookaheadBuffers = ConcurrentHashMap<AudioRecord, FloatArray>()
@@ -307,6 +306,7 @@ object AudioHooks {
             override fun afterHookedMethod(p: MethodHookParam) {
                 Logx.d("startRecording() COMPLETED")
                 Prefs.reloadIfStale(500)
+                updateGlobalBoostFactor()
                 if (!Prefs.moduleEnabled) {
                     Logx.d("startRecording: module disabled")
                     return
@@ -368,8 +368,15 @@ object AudioHooks {
                     if (count <= 0) return
 
                     val ar = p.thisObject as AudioRecord
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) {
-                        Logx.d("read(ShortArray): skipping processing - enabled=${Prefs.moduleEnabled}, preboost=${Prefs.enablePreboost}, pcm16=${isPcm16[ar]}")
+                    ensureCompressorInitialized(ar)
+
+                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) {
+                        Logx.d("read(ShortArray): skipping processing - enabled=${Prefs.moduleEnabled}, preboost=${Prefs.enablePreboost}")
+                        return
+                    }
+
+                    if (!ensurePcm16(ar, observedSamples = true)) {
+                        Logx.d("read(ShortArray): formato no compatible, omitido")
                         return
                     }
                     Logx.d("read(ShortArray): PROCESSING AUDIO with boost=${globalBoostFactor}x")
@@ -398,7 +405,9 @@ object AudioHooks {
                     if (count <= 0) return
 
                     val ar = p.thisObject as AudioRecord
-                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                    ensureCompressorInitialized(ar)
+                    if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
+                    if (!ensurePcm16(ar, observedSamples = (count >= 2))) return
 
                     val buf = p.args[0] as ByteArray
                     val off = p.args[1] as Int
@@ -425,11 +434,13 @@ object AudioHooks {
                         if (count <= 0) return
 
                         val ar = p.thisObject as AudioRecord
-                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost || isPcm16[ar] != true) return
+                        ensureCompressorInitialized(ar)
+                        if (!Prefs.moduleEnabled || !Prefs.enablePreboost) return
 
                         val bb = p.args[0] as ByteBuffer
                         val valid = min(count, bb.remaining())
                         if (valid <= 1) return
+                        if (!ensurePcm16(ar, observedSamples = (valid >= 2))) return
 
                         processByteBufferWithCompressor(bb, valid, globalBoostFactor, ar)
                         totalPreBoostsApplied++
@@ -731,7 +742,8 @@ object AudioHooks {
                                     // Si es ShortArray, aplicar boost
                                     if (method.parameterTypes.any { it == ShortArray::class.java }) {
                                         val ar = p.thisObject as AudioRecord
-                                        if (Prefs.moduleEnabled && Prefs.enablePreboost && isPcm16[ar] == true) {
+                                        ensureCompressorInitialized(ar)
+                                        if (Prefs.moduleEnabled && Prefs.enablePreboost && ensurePcm16(ar, observedSamples = true)) {
                                             val buf = p.args.find { it is ShortArray } as? ShortArray
                                             val offset = (p.args.find { it is Int && it != result } as? Int) ?: 0
                                             
@@ -771,5 +783,28 @@ object AudioHooks {
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                 .toShort()
         }
+    }
+
+    private fun ensureCompressorInitialized(ar: AudioRecord) {
+        if (compressorStates.containsKey(ar)) return
+        val sr = try { ar.sampleRate } catch (_: Throwable) { SR_FALLBACK }
+        initCompressorForRecord(ar, sr)
+    }
+
+    private fun ensurePcm16(ar: AudioRecord, observedSamples: Boolean): Boolean {
+        val cached = isPcm16[ar]
+        if (cached == true) return true
+
+        val encNow = try { ar.audioFormat } catch (_: Throwable) { AudioFormat.ENCODING_INVALID }
+        val is16 = when (encNow) {
+            AudioFormat.ENCODING_PCM_16BIT -> true
+            AudioFormat.ENCODING_DEFAULT, AudioFormat.ENCODING_INVALID -> observedSamples
+            else -> false
+        }
+
+        if (is16) {
+            isPcm16[ar] = true
+        }
+        return is16
     }
 }
