@@ -1,5 +1,4 @@
 package com.d4vram.whatsmicfix
-
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,18 +8,14 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.util.concurrent.atomic.AtomicReference
-
 private const val APP_PKG = "com.d4vram.whatsmicfix" // para broadcasts de vuelta a tu app
-
 /** Guarda un ApplicationContext accesible desde los hooks. */
 object AppCtx {
     private val ref = AtomicReference<Context?>(null)
     fun set(ctx: Context) { ref.compareAndSet(null, ctx.applicationContext) }
     fun get(): Context? = ref.get()
 }
-
 class HookEntry : IXposedHookLoadPackage {
-
     // Target UNIVERSAL - todos los procesos que usan audio + sistema
     private val targetPkgs = setOf(
         "com.whatsapp", "com.whatsapp.w4b",           // WhatsApp
@@ -30,7 +25,6 @@ class HookEntry : IXposedHookLoadPackage {
         "media.audio",                                // Servicios de audio
         "audioserver"                                 // Servidor de audio
     )
-
     // Apps de audio populares para máxima cobertura
     private val audioApps = setOf(
         "com.google.android.apps.recorder",           // Grabadora Google
@@ -40,25 +34,17 @@ class HookEntry : IXposedHookLoadPackage {
         "org.telegram.messenger",
         "com.facebook.orca",                          // Messenger
         "us.zoom.videomeetings",
-        "com.skype.raider",
         "com.discord"
     )
-
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName
-
         // Hook UNIVERSAL: apps de audio o sistema
-        if (!targetPkgs.contains(pkg) && !audioApps.contains(pkg) && !isAudioRelated(pkg)) return
         Logx.d("Cargando hooks UNIVERSALES en $pkg")
-
         installUniversalHooks(lpparam)
     }
-
     private fun isAudioRelated(pkg: String): Boolean {
         val audioKeywords = listOf("audio", "record", "voice", "sound", "call", "phone", "media")
-        return audioKeywords.any { pkg.contains(it, ignoreCase = true) }
     }
-
     private fun installUniversalHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
         XposedHelpers.findAndHookMethod(
             "android.app.Application",
@@ -71,10 +57,8 @@ class HookEntry : IXposedHookLoadPackage {
                         val ctx = param.args[0] as? Context ?: return
                         AppCtx.set(ctx)
                         Logx.d("Application.attach capturado; ctx=${ctx.packageName}")
-
                         // Usar el contexto que tengamos disponible
                         val workingCtx = ctx.applicationContext ?: ctx
-
                         // Canario -> tu app
                         try {
                             workingCtx.sendBroadcast(
@@ -87,7 +71,6 @@ class HookEntry : IXposedHookLoadPackage {
                         } catch (t: Throwable) {
                             Logx.e("Error enviando canario", t)
                         }
-
                         // RELOAD
                         try {
                             val filter = IntentFilter("com.d4vram.whatsmicfix.RELOAD")
@@ -117,7 +100,6 @@ class HookEntry : IXposedHookLoadPackage {
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver RELOAD", t)
                         }
-
                         // PING
                         try {
                             val filter = IntentFilter("com.d4vram.whatsmicfix.PING")
@@ -147,14 +129,10 @@ class HookEntry : IXposedHookLoadPackage {
                         } catch (t: Throwable) {
                             Logx.e("Error registrando receiver PING", t)
                         }
-
-                    } catch (mainError: Throwable) {
-                        Logx.e("Error crítico en Application.attach hook", mainError)
                     }
                 }
             }
         )
-
         AudioHooks.install(lpparam)
     }
 }

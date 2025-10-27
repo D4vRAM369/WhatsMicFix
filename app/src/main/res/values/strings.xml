@@ -2,7 +2,6 @@
     <string name="app_name">WhatsMicFix</string>
     <string name="app_name_description">WhatsMicFix v1.4-stable</string>
     <string name="enable_preboost">Activar pre-boost</string>
-    <string name="boost_gain_display">Ganancia: x1.00 (+0.0 dB)</string>
     <string name="boost_range_info">Rango: 0.5× … 4.0×   (si distorsiona, baja el deslizador)</string>
     <string name="stability_options">Opciones de estabilidad</string>
     <string name="respect_app_format">Respetar formato que pida la app (recomendado)</string>

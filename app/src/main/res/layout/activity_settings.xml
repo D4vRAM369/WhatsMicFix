@@ -3,12 +3,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#111316">
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
-
         <!-- Contenido principal -->
         <LinearLayout
             android:orientation="vertical"
@@ -18,7 +16,6 @@
             android:paddingTop="40dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
-
             <TextView
                 android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
@@ -28,7 +25,6 @@
                 android:textStyle="bold"
                 android:textSize="20sp"
                 android:textColor="#FFFFFF" />
-
             <Switch
                 android:id="@+id/swEnable"
                 android:layout_width="wrap_content"
@@ -36,7 +32,6 @@
                 android:layout_marginTop="16dp"
                 android:text="@string/enable_preboost"
                 android:textColor="#FFFFFF" />
-
             <TextView
                 android:id="@+id/tvFactor"
                 android:layout_width="wrap_content"
@@ -44,7 +39,6 @@
                 android:layout_marginTop="12dp"
                 android:text="Ganancia: x1.35 (+2.6 dB)"
                 android:textColor="#B0BEC5" />
-
             <SeekBar
                 android:id="@+id/seekBoost"
                 android:layout_width="match_parent"
@@ -52,7 +46,6 @@
                 android:layout_marginTop="10dp"
                 android:max="400"
                 android:progress="135" />
-
             <TextView
                 android:id="@+id/tvRangeInfo"
                 android:layout_width="wrap_content"
@@ -60,7 +53,6 @@
                 android:layout_marginTop="12dp"
                 android:text="@string/boost_range_info"
                 android:textColor="#8FA3AD" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -68,7 +60,6 @@
                 android:text="@string/stability_options"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF" />
-
             <Switch
                 android:id="@+id/swRespectFmt"
                 android:layout_width="wrap_content"
@@ -76,34 +67,29 @@
                 android:layout_marginTop="10dp"
                 android:text="@string/respect_app_format"
                 android:textColor="#FFFFFF" />
-
             <Switch
                 android:id="@+id/swForceMic"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/force_mic_source"
                 android:textColor="#FFFFFF" />
-
             <Switch
                 android:id="@+id/swAgc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/enable_agc"
                 android:textColor="#FFFFFF" />
-
             <Switch
                 android:id="@+id/swNs"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/enable_ns"
                 android:textColor="#FFFFFF" />
-
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="28dp"
                 android:background="#222427" />
-
             <TextView
                 android:id="@+id/tvSupportTitle"
                 android:layout_width="wrap_content"
@@ -112,7 +98,6 @@
                 android:text="@string/support_section_title"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold" />
-
             <TextView
                 android:id="@+id/btnGithubSupport"
                 android:layout_width="match_parent"
@@ -129,7 +114,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground" />
-
             <TextView
                 android:id="@+id/btnBuyCoffee"
                 android:layout_width="match_parent"
@@ -148,7 +132,5 @@
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground" />
         </LinearLayout>
-
-
     </LinearLayout>
 </ScrollView>

@@ -3,22 +3,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
     <!-- Burbuja de chat -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M20,20 L88,20 Q98,20 98,30 L98,70 Q98,80 88,80 L60,80 L50,90 L40,80 L20,80 Q10,80 10,70 L10,30 Q10,20 20,20 Z"/>
-    
     <!-- Micrófono dentro de la burbuja -->
     <path
         android:fillColor="#000000"
         android:pathData="M45,35 L63,35 Q65,35 65,37 L65,55 Q65,57 63,57 L45,57 Q43,57 43,55 L43,37 Q43,35 45,35 Z"/>
-    
     <!-- Base del micrófono -->
     <path
         android:fillColor="#000000"
         android:pathData="M50,57 L58,57 Q60,57 60,59 L60,65 Q60,67 58,67 L50,67 Q48,67 48,65 L48,59 Q48,57 50,57 Z"/>
-    
     <!-- Línea horizontal en la base -->
     <path
         android:fillColor="#000000"
