@@ -15,6 +15,9 @@
 
 ---
 
+[🌍 English version](README_english-version.md)
+
+
 ## ✨ Nuevo en v1.4
 
 * **Estabilidad total**: el boost y el compresor ahora se preparan *antes* de iniciar la grabación, eliminando completamente la **race condition** que provocaba audios sin efecto.
