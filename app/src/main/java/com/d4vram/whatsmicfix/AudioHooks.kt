@@ -146,14 +146,17 @@ object AudioHooks {
             Int::class.javaPrimitiveType,
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(p: MethodHookParam) {
+                    // Guardar parámetros originales para fallback
+                    val origSource = p.args[0] as Int
+                    val origSr     = p.args[1] as Int
+                    val origCh     = p.args[2] as Int
+                    val origFmt    = p.args[3] as Int
+
                     try {
                         Prefs.reloadIfStale(500)
                         if (!Prefs.moduleEnabled) return
 
-                        val origSr  = p.args[1] as Int
-                        val origCh  = p.args[2] as Int
-                        val origFmt = p.args[3] as Int
-
+                        // Validar parámetros originales
                         val validSr = if (origSr in 8000..192000) origSr else SR_FALLBACK
                         val validCh = when (origCh) {
                             AudioFormat.CHANNEL_IN_MONO, AudioFormat.CHANNEL_IN_STEREO -> origCh
@@ -164,32 +167,63 @@ object AudioHooks {
                             else -> AudioFormat.ENCODING_PCM_16BIT
                         }
 
-                        if (Prefs.forceSourceMic) p.args[0] = MediaRecorder.AudioSource.MIC
+                        // Aplicar forceSourceMic si está habilitado
+                        if (Prefs.forceSourceMic) {
+                            p.args[0] = MediaRecorder.AudioSource.MIC
+                        }
 
                         if (!Prefs.respectAppFormat) {
-                            val sr = pickSampleRate(validSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                            p.args[1] = sr
-                            p.args[2] = AudioFormat.CHANNEL_IN_MONO
-                            p.args[3] = AudioFormat.ENCODING_PCM_16BIT
-                        } else {
-                            val minBufSize = AudioRecord.getMinBufferSize(validSr, validCh, validFmt)
-                            if (minBufSize <= 0 || minBufSize == AudioRecord.ERROR_BAD_VALUE) {
-                                p.args[1] = SR_FALLBACK
+                            // Intentar con nuestros parámetros preferidos
+                            val preferredSr = pickSampleRate(validSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+
+                            // CRÍTICO: Validar que los parámetros preferidos funcionen
+                            val testBufSize = AudioRecord.getMinBufferSize(preferredSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+
+                            if (testBufSize > 0 && testBufSize != AudioRecord.ERROR_BAD_VALUE) {
+                                // ✅ Parámetros preferidos son válidos
+                                p.args[1] = preferredSr
                                 p.args[2] = AudioFormat.CHANNEL_IN_MONO
                                 p.args[3] = AudioFormat.ENCODING_PCM_16BIT
+                                Logx.d("AudioRecord ctor: usando preferidos sr=$preferredSr")
                             } else {
+                                // ❌ Parámetros preferidos NO funcionan → usar ORIGINALES de WhatsApp
+                                p.args[1] = origSr
+                                p.args[2] = origCh
+                                p.args[3] = origFmt
+                                Logx.w("AudioRecord ctor: preferidos fallaron, usando originales sr=$origSr ch=$origCh fmt=$origFmt")
+                            }
+                        } else {
+                            // respectAppFormat = true: validar parámetros originales
+                            val minBufSize = AudioRecord.getMinBufferSize(validSr, validCh, validFmt)
+                            if (minBufSize > 0 && minBufSize != AudioRecord.ERROR_BAD_VALUE) {
                                 p.args[1] = validSr
                                 p.args[2] = validCh
                                 p.args[3] = validFmt
+                            } else {
+                                // Fallback: intentar con SR_FALLBACK
+                                val fallbackBufSize = AudioRecord.getMinBufferSize(SR_FALLBACK, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                                if (fallbackBufSize > 0) {
+                                    p.args[1] = SR_FALLBACK
+                                    p.args[2] = AudioFormat.CHANNEL_IN_MONO
+                                    p.args[3] = AudioFormat.ENCODING_PCM_16BIT
+                                    Logx.w("AudioRecord ctor: usando fallback SR_FALLBACK")
+                                } else {
+                                    // Último recurso: dejar parámetros originales
+                                    p.args[1] = origSr
+                                    p.args[2] = origCh
+                                    p.args[3] = origFmt
+                                    Logx.w("AudioRecord ctor: TODO FALLÓ, usando params originales de WhatsApp")
+                                }
                             }
                         }
 
-                        Logx.d("AudioRecord ctor: sr=${p.args[1]}, ch=${p.args[2]}, fmt=${p.args[3]}")
                     } catch (t: Throwable) {
-                        Logx.e("Error en hook constructor AudioRecord", t)
-                        p.args[1] = SR_FALLBACK
-                        p.args[2] = AudioFormat.CHANNEL_IN_MONO
-                        p.args[3] = AudioFormat.ENCODING_PCM_16BIT
+                        // Si CUALQUIER cosa falla, restaurar parámetros originales
+                        Logx.e("Error en hook constructor AudioRecord - RESTAURANDO ORIGINALES", t)
+                        p.args[0] = origSource
+                        p.args[1] = origSr
+                        p.args[2] = origCh
+                        p.args[3] = origFmt
                     }
                 }
 
@@ -256,29 +290,59 @@ object AudioHooks {
             XposedHelpers.findAndHookMethod(builderCls, "setAudioFormat",
                 AudioFormat::class.java, object : XC_MethodHook() {
                     override fun beforeHookedMethod(p: MethodHookParam) {
-                        Prefs.reloadIfStale(500)
-                        val inFmt = p.args[0] as AudioFormat? ?: return
+                        val originalFmt = p.args[0] as AudioFormat? ?: return
 
-                        if (!Prefs.respectAppFormat) {
-                            val sr = pickSampleRate(inFmt.sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                            p.args[0] = AudioFormat.Builder()
-                                .setSampleRate(sr)
-                                .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                                .build()
-                        } else {
-                            val srOk = inFmt.sampleRate > 0 &&
-                                AudioRecord.getMinBufferSize(inFmt.sampleRate, inFmt.channelMask, inFmt.encoding) > 0
-                            val sr = if (srOk) inFmt.sampleRate else SR_FALLBACK
-                            val enc = if (inFmt.encoding == AudioFormat.ENCODING_INVALID)
-                                AudioFormat.ENCODING_PCM_16BIT else inFmt.encoding
-                            if (sr != inFmt.sampleRate || enc != inFmt.encoding) {
-                                p.args[0] = AudioFormat.Builder()
-                                    .setSampleRate(sr)
-                                    .setChannelMask(inFmt.channelMask)
-                                    .setEncoding(enc)
-                                    .build()
+                        try {
+                            Prefs.reloadIfStale(500)
+
+                            if (!Prefs.respectAppFormat) {
+                                // Intentar con parámetros preferidos
+                                val preferredSr = pickSampleRate(originalFmt.sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+
+                                // CRÍTICO: Validar que funcionen
+                                val testBufSize = AudioRecord.getMinBufferSize(preferredSr, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+
+                                if (testBufSize > 0 && testBufSize != AudioRecord.ERROR_BAD_VALUE) {
+                                    // ✅ Usar parámetros preferidos
+                                    p.args[0] = AudioFormat.Builder()
+                                        .setSampleRate(preferredSr)
+                                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                        .build()
+                                    Logx.d("Builder: usando preferidos sr=$preferredSr")
+                                } else {
+                                    // ❌ Fallaron → mantener original
+                                    Logx.w("Builder: preferidos fallaron, manteniendo formato original")
+                                    // No modificar p.args[0] - dejar el original
+                                }
+                            } else {
+                                // respectAppFormat = true: validar originales
+                                val srOk = originalFmt.sampleRate > 0 &&
+                                    AudioRecord.getMinBufferSize(originalFmt.sampleRate, originalFmt.channelMask, originalFmt.encoding) > 0
+
+                                if (srOk) {
+                                    // Original es válido, mantenerlo
+                                    // No hacer nada
+                                } else {
+                                    // Original NO es válido, intentar con fallback
+                                    val fallbackBufSize = AudioRecord.getMinBufferSize(SR_FALLBACK, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                                    if (fallbackBufSize > 0) {
+                                        p.args[0] = AudioFormat.Builder()
+                                            .setSampleRate(SR_FALLBACK)
+                                            .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                            .build()
+                                        Logx.w("Builder: usando fallback SR_FALLBACK")
+                                    } else {
+                                        // Último recurso: mantener original y esperar lo mejor
+                                        Logx.w("Builder: TODO FALLÓ, manteniendo formato original")
+                                    }
+                                }
                             }
+                        } catch (t: Throwable) {
+                            // Si hay error, mantener formato original
+                            Logx.e("Error en Builder.setAudioFormat - manteniendo original", t)
+                            p.args[0] = originalFmt
                         }
                     }
                 })
