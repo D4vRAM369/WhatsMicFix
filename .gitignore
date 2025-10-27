@@ -36,3 +36,7 @@ fastlane/screenshots/
 Thumbs.db
 
 keystore.properties
+
+# build outputs
+app/debug/
+app/release/
