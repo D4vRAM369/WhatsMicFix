@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/Gradle-8.2%2B-02303A?logo=gradle"/>
   <img src="https://img.shields.io/badge/License-GPLv3-green"/>
   <img src="https://img.shields.io/badge/Made_with-ChatGPT_&_PBL-8A2BE2?logo=openai&logoColor=white"/>
+  <img src="https://img.shields.io/badge/ClaudeCode_&_PBL-powered-4B0082?style=flat-square&logo=anthropic&logoColor=white"/>
   <img src="https://img.shields.io/badge/Optimized_for-Pixel_Devices-lightblue?logo=google"/>
   <img src="https://img.shields.io/badge/Audio_Processing-DSP-orange"/>
   <img src="https://img.shields.io/badge/Made_with-Love_&_Coffee-ff69b4"/>
