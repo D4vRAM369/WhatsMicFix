@@ -1,6 +1,7 @@
 <p align="center">
   <img src="https://github.com/user-attachments/assets/5d8cfba5-8faa-4176-a689-c47b982c41ee" width="400" height="400" alt="WhatsMicFix icon"/><br><br>
   <b>🎧 WhatsMicFix v1.4</b><br><br>
+  <img src="https://img.shields.io/github/downloads/D4vRAM369/WhatsMicFix/total?color=blue" alt="Downloads"/>
   <img src="https://img.shields.io/badge/Kotlin-1.9%2B-orange"/>
   <img src="https://img.shields.io/badge/Android-12%2B-brightgreen?logo=android"/>
   <img src="https://img.shields.io/badge/LSPosed-1.9%2B-blue?logo=android"/>
