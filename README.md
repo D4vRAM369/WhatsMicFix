@@ -113,6 +113,22 @@ El módulo intercepta y modifica **`AudioRecord`** para mejorar la señal de ent
 
 Esta versión v1.4 marca el paso de un fix experimental a un **módulo de audio profesional**, con mejoras de estabilidad, compatibilidad y eficiencia.
 
+## Aclaración Final sobre Compatibilidad y Mensaje Personal
+
+**Importante**: NO TODOS LOS DISPOSITIVOS PIXEL PRESENTAN ESTE PROBLEMA.  
+
+En modelos de la serie Pixel 9 (actualmente estoy en un Pixel 9a), el volumen bajo en los audios de WhatsApp ya está corregido de forma nativa, y el módulo no es necesario (ni afecta negativamente, aunque no lo he probado aún personalmente en éste). Sin embargo, muchos usuarios de modelos anteriores siguen sufriendo este bug molesto, angustioso y desesperante, incluso en Android 16.  
+
+Espero que este módulo siga ayudando a esos usuarios mientras Google no lo solucione oficialmente para todos los modelos antiguos por medio de algún tipo de comunicado oficial sobre éste famoso tema, que ya tiene 2 años mínimos de antiguedad, sin una solución clara por parte de Google o Facebook (Meta), echando la pelota hacia el otro tejado mutuamente. 
+
+Este problema lo sufrí durante varios meses en mi Pixel 8, y lo que empezó como una solución personal poco a poco se convirtió en mi **primer proyecto público**. Nunca imaginé la aceptación que tendría en tan poco tiempo (16 estrellas en menos de 4 meses) y la difusión que tuvo en canales de Telegram con miles de usuarios como popMODS, MRP-Discussion y Magisk Root Port (éste último ya ha sido cerrado), por las que me enteré de ello por un camarada un de grupo de Magisk y root en cual estoy, donde lo rularon en su momento mencionándome que se había compartido.
+
+**Gracias de corazón** a todos y todas por el support y el apoyo ❤️ Sin saberlo, me disteis más gasolina para el Ferrari metafórico de aprendizaje y creación en el que estoy montado **a full** desde entonces, de forma aún más activa y profunda. La motivación es una herramienta poderosísima.  
+
+Si alguien está dispuesto a colaborar (mejoras en el código, soporte para más apps, versión non-root vía Shizuku, o cualquier idea), ¡adelante! Abre un **Pull Request** o Issue. Estoy abierto a todo lo que haga el módulo más útil y accesible.
+
+¡Seguimos dándole caña! ☕🔊
+
 ---
 
 ## 💬 Soporte al Proyecto
