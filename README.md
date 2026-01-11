@@ -1,9 +1,6 @@
 <p align="center">
   <img src="https://github.com/user-attachments/assets/5d8cfba5-8faa-4176-a689-c47b982c41ee" width="400" height="400" alt="WhatsMicFix icon"/><br><br>
   <b>🎧 WhatsMicFix v1.4</b><br><br>
-  <img src="https://img.shields.io/github/stars/D4vRAM369/WhatsMicFix?style=social" alt="Stars"/>
-  <img src="https://img.shields.io/github/downloads/D4vRAM369/WhatsMicFix/total?color=blue" alt="Downloads"/>
-  <img src="https://img.shields.io/github/release-date/D4vRAM369/WhatsMicFix?color=green" alt="Latest Release"/>
   <img src="https://img.shields.io/badge/Kotlin-1.9%2B-orange"/>
   <img src="https://img.shields.io/badge/Android-12%2B-brightgreen?logo=android"/>
   <img src="https://img.shields.io/badge/LSPosed-1.9%2B-blue?logo=android"/>
@@ -17,88 +14,120 @@
   <a href="https://www.buymeacoffee.com/D4vRAM369"><img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-5F7FFF"/></a>
 </p>
 
-[🌍 English version](README_english-version.md) | [🇪🇸 Versión en Español (esta página)]
+---
 
-# WhatsMicFix – Fix for Low Mic Volume in WhatsApp Voice Notes on Affected Pixels
+[🌍 Versión completa en inglés (recomendada para SEO y contribuciones globales)](README_english-version.md) | 🇪🇸 Esta es la versión en español principal
 
-**LSPosed module** that applies a configurable pre-amplifier (gain boost) to improve microphone input quality in WhatsApp on Pixel devices where voice notes record too quietly.
 
-Tested and proven on **Pixel 8** with Android 16. May help on other affected Pixels (report in Issues if you test on Pixel 9 series or others). Not needed on devices like Pixel 9a where audio is already good natively.
+## ✨ Nuevo en v1.4
+
+* **Estabilidad total**: el boost y el compresor ahora se preparan *antes* de iniciar la grabación, eliminando completamente la **race condition** que provocaba audios sin efecto.
+* **Triple capa de protección**:
+  * Detección anticipada del formato (`AudioFormat.ENCODING_PCM_16BIT`) antes del primer `read()`.
+  * **Modo permisivo**: si WhatsApp devuelve un formato desconocido, el módulo asume PCM16.
+  * Fallback automático para evitar rechazos o errores de inicialización.
+* **Reseteo inteligente del compresor** en cada sesión → evita heredar ganancia baja del audio anterior.
+* **Splash screen negra** al abrir la app (inicio limpio y sin flicker).
+* **Rendimiento mejorado**: menor carga en CPU, inicio más rápido y comportamiento consistente.
+* **Nueva sección de soporte en el README** para colaborar y dar estrellas ⭐.
 
 ---
 
-## ✨ What's New in v1.4 (Stable Release)
-- **Full stability**: Boost & compressor prepared **before** recording starts → eliminates race condition completely.
-- **Triple protection layer**:
-  - Early format detection (`AudioFormat.ENCODING_PCM_16BIT`) before first `read()`.
-  - Permissive mode: Assume PCM16 if unknown format from WhatsApp.
-  - Auto-fallback to prevent initialization errors.
-- **Smart compressor reset** per session → no inherited low gain from previous audio.
-- Black splash screen for clean app launch (no flicker).
-- Improved performance: Lower CPU load, faster startup, consistent behavior.
+## 🚀 Uso
+
+1. Instala el APK como **módulo LSPosed** y habilítalo para:
+
+   * *WhatsApp* (`com.whatsapp`)
+   * **Framework del sistema** (`system`)
+   * **Sistema Android** (`android`)
+
+   > **Si no ves “system” o “android”** en la lista de scopes: ve a **Ajustes de LSPosed → (icono arriba a la derecha) → Ocultar** y **desmarca “Aplicaciones del sistema”**.
+
+2. Abre **WhatsMicFix** y ajusta las preferencias:
+
+   * Ganancia en dB (**–6 dB … +12 dB**, hasta ×4.0)
+   * Pre-boost opcional
+   * AGC y Supresión de ruido
+   * Forzado de micrófono interno
+
+3. Ajusta la **ganancia** con el deslizador (recomendado: **1.5× – 3.0×**).
+
+4. (Opcional) **Forzar detención** de WhatsApp tras cambiar ajustes:
+
+   * **Ajustes del sistema → Apps → WhatsApp → Forzar detención**, luego vuelve a abrir WhatsApp.
+
+5. Abre WhatsApp y graba un audio.
+
+   * Si solo cierras desde **Recientes**, el proceso puede quedar activo y no aplicar cambios.
+   * Espera unos **5 segundos** para que WhatsApp inicialice `AudioRecord` y los hooks actúen correctamente.
+
+> *Nota:* La v1.4 aplica cambios en caliente, pero **forzar detención** garantiza la activación completa de los nuevos parámetros.
 
 ---
 
-## 🚀 Quick Setup & Usage
-1. Install APK as **LSPosed module** and enable for:
-   - WhatsApp (`com.whatsapp`)
-   - System Framework (`system`)
-   - Android System (`android`)
-   
-   > **Tip**: If "system" or "android" not visible → LSPosed Settings → (top-right icon) → Hide → uncheck "Hide system apps".
+## ⚙️ Configuración Avanzada
 
-2. Open WhatsMicFix app and configure:
-   - Gain boost (–6 dB to +12 dB, recommended 1.5× – 3.0×)
-   - Optional pre-boost, AGC, noise suppression
-   - Force internal mic if needed
-
-3. **Optional but recommended**: Force stop WhatsApp after changes (Settings → Apps → WhatsApp → Force stop) → reopen WhatsApp.
-4. Record a voice note in WhatsApp (wait ~5 seconds for AudioRecord init).
-
-> Note: v1.4 supports hot changes, but force stop ensures full effect.
+* **Respetar formato**: mantiene el formato de audio solicitado por la app (recomendado).
+* **Forzar fuente MIC**: úsalo solo si el micrófono no cambia correctamente.
+* **AGC / Supresor de ruido**: mejora adicional de calidad de entrada.
+* **Logs de depuración**: visibles con `adb logcat | grep WhatsMicFix`.
 
 ---
 
-## ⚙️ Advanced Settings
-- Respect requested format (recommended)
-- Force MIC source (only if mic switching fails)
-- AGC / Noise suppression (extra quality boost)
-- Debug logs: `adb logcat | grep WhatsMicFix`
+## 📊 Mejoras Técnicas
+
+* `updateGlobalBoostFactor()` movido a **beforeHookedMethod()** → el boost se aplica antes de grabar.
+* **Detección anticipada** del formato PCM16 y cacheado thread-safe con `ConcurrentHashMap`.
+* **Reseteo del compresor** en cada sesión: evita estados de ganancia residuales.
+* **Modo permisivo en ensurePcm16()** → procesa incluso si WhatsApp retrasa el formato.
+* **Validación completa del flujo de audio** para máxima compatibilidad.
 
 ---
 
-## 📊 Technical Comparison (v1.3 vs v1.4)
+## 🛠️ Correcciones
 
-| Feature                        | v1.3       | v1.4 (Current) |
-|--------------------------------|------------|----------------|
-| First audio stable             | ~90%       | 100%           |
-| Consecutive audios OK          | ~95%       | 100%           |
-| "Invalid format" alerts        | 1–2/session| 0              |
-| Hook timing                    | Variable   | Consistent     |
-| Diagnostic logs                | Limited    | Full           |
+* Eliminado el bug del **primer audio sin boost**.
+* Corregida la detección de formato inválido (`AudioFormat.ENCODING_INVALID`).
+* Evitada la herencia de valores antiguos del compresor.
+* Sin falsos negativos ni rechazos del hook.
 
 ---
 
-## 🛠️ Key Technical Improvements
-- `updateGlobalBoostFactor()` moved to `beforeHookedMethod()` for pre-recording boost.
-- Thread-safe PCM16 detection & caching with `ConcurrentHashMap`.
-- Session-based compressor reset.
-- Permissive handling in `ensurePcm16()`.
+## 🔹 Comparativa Técnica
+
+| Aspecto                        | v1.3                     | v1.4 (actual) |
+|--------------------------------|--------------------------|----------------|
+| **Primer audio estable**       | ~90 %                   | ✅ 100 % |
+| **Audios consecutivos OK**     | ~95 %                   | ✅ 100 % |
+| **Alertas “formato inválido”** | 1–2 por sesión           | 🚫 0 |
+| **Tiempo de hook**             | Variable                 | ⚡ Consistente |
+| **Logs de diagnóstico**        | Limitados                | 🧠 Completos |
 
 ---
 
-## 💬 Support & Contribute
-If this helps you, please consider:
+## 📚 Notas Técnicas
+
+WhatsMicFix está desarrollado siguiendo el método **Project-Based Learning (PBL)**, que combina aprendizaje práctico con desarrollo real.  
+El módulo intercepta y modifica **`AudioRecord`** para mejorar la señal de entrada en WhatsApp, especialmente en **dispositivos Pixel**, donde el volumen del micrófono suele ser bajo.
+
+Esta versión v1.4 marca el paso de un fix experimental a un **módulo de audio profesional**, con mejoras de estabilidad, compatibilidad y eficiencia.
+
+---
+
+## 💬 Soporte al Proyecto
+
+Si este módulo te ha sido útil, considera apoyarlo:
+
 <p align="center">
-  <a href="https://github.com/D4vRAM369/WhatsMicFix/stargazers"><img src="https://img.shields.io/badge/Give_a_Star-⭐-yellow?style=for-the-badge"/></a>
-  <a href="https://www.buymeacoffee.com/D4vRAM369"><img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-blueviolet?style=for-the-badge"/></a>
+  <a href="https://github.com/D4vRAM369/WhatsMicFix/stargazers">
+    <img src="https://img.shields.io/badge/Give_a_Star_on_GitHub-⭐-yellow?style=for-the-badge"/>
+  </a>
+  <a href="https://www.buymeacoffee.com/D4vRAM369">
+    <img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-blueviolet?style=for-the-badge"/>
+  </a>
 </p>
 
-Open Issues for feedback, compatibility reports (your Pixel model + Android version), or feature requests!
-
 ---
 
-*Developed via Project-Based Learning (PBL) with collaborative AI tools.*  
-💚 **License: GPLv3** – Open source and transparent.
-
-¡Gracias por probarlo! Reporta resultados para mejorar compatibilidad. ☕🔊
+💡 *Desarrollado por D4vRAM mediante aprendizaje PBL e IA colaborativa.*  
+💚 Licencia: **GPLv3 – Software libre, código abierto y transparente.**
