@@ -35,8 +35,11 @@ actúa **en tiempo de ejecución**, de forma reversible y controlada.
 
 Está pensado principalmente para **usuarios avanzados con root y LSPosed**, y ha sido **optimizado para dispositivos Pixel**, donde este bug lleva años sin una solución oficial clara por parte de Google o Meta.
 
-> ⚠️ Este módulo solo es útil si tu dispositivo presenta el problema. En modelos donde el bug ya está corregido, no es necesario.
+> ⚠️ Este módulo solo es útil si tu dispositivo presenta el problema.
+> En modelos donde el bug ya está corregido, no es necesario.
 
+
+---
 
 ## ✨ Nuevo en v1.4
 
