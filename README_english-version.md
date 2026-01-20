@@ -18,6 +18,30 @@
 
 [🇪🇸 Spanish version (primary for local community)](#README.md) | 🌍 This is the full English version (recommended for global SEO and contributions)
 
+## ❓ What is WhatsMicFix?
+
+**WhatsMicFix** is an **LSPosed module** that fixes the **abnormally low microphone volume in WhatsApp voice notes**, a long-standing issue affecting several **Google Pixel devices**, even on recent Android versions.
+
+The module internally intercepts the audio recording pipeline using hooks on `AudioRecord`, allowing it to:
+
+- Adjust the **actual microphone gain** (pre and post-processing).
+- Apply **dynamic compression**, AGC, and noise suppression.
+- Prevent initialization failures and **race conditions** at the start of recording.
+- Maintain stability and compatibility even when WhatsApp reports inconsistent audio formats.
+
+WhatsMicFix **does not modify WhatsApp**, does not patch APKs, and does not alter system files.  
+It works **at runtime**, in a reversible and controlled manner.
+
+It is primarily intended for **advanced users with root and LSPosed**, and has been **optimized for Pixel devices**, where this bug has remained unresolved for years without a clear official fix from Google or Meta.
+
+> ⚠️ This module is only useful if your device actually suffers from this issue.  
+> On models where the bug has already been fixed, WhatsMicFix is not necessary.
+
+
+
+---
+
+
 ## ✨ What's New in v1.4
 * **Full stability**: The boost and compressor are now prepared *before* recording starts, completely eliminating the **race condition** that caused audio without the effect applied.
 * **Triple protection layer**:
