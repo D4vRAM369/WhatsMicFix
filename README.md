@@ -19,6 +19,22 @@
 
 [🌍 Versión completa en inglés (recomendada para SEO y contribuciones globales)](README_english-version.md) | 🇪🇸 Esta es la versión en español principal
 
+## ❓ ¿Qué es WhatsMicFix?
+
+**WhatsMicFix** es un **módulo para LSPosed** que corrige el **volumen anormalmente bajo del micrófono en las notas de voz de WhatsApp**, un problema persistente que afecta a varios **dispositivos Google Pixel**, incluso en versiones recientes de Android.
+
+El módulo intercepta internamente el flujo de grabación de audio mediante hooks sobre `AudioRecord`, permitiendo:
+
+- Ajustar la **ganancia real del micrófono** (pre y post-procesado).
+- Aplicar **compresión dinámica**, AGC y supresión de ruido.
+- Evitar fallos de inicialización y **race conditions** durante el inicio de la grabación.
+- Mantener compatibilidad y estabilidad incluso cuando WhatsApp reporta formatos inconsistentes.
+
+WhatsMicFix **no modifica WhatsApp**, no parchea APKs ni altera archivos del sistema:  
+actúa **en tiempo de ejecución**, de forma reversible y controlada.
+
+Está pensado principalmente para **usuarios avanzados con root y LSPosed**, y ha sido **optimizado para dispositivos Pixel**, donde este bug lleva años sin una solución oficial clara por parte de Google o Meta.
+
 
 ## ✨ Nuevo en v1.4
 
