@@ -137,6 +137,8 @@ If this module has been useful to you, consider supporting it:
     <img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-blueviolet?style=for-the-badge"/>
   </a>
 </p>
+
 ---
-💡 *Developed by D4vRAM through Project-Based Learning (PBL) and collaborative AI tools.*
-💚 **License: GPLv3** – Free, open-source, and transparent software.
+
+💡 *Developed by D4vRAM using PBL learning and collaborative AI.*  
+💚 License: **GPLv3 – Free, open-source, and transparent software.**
