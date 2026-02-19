@@ -15,6 +15,12 @@
   <a href="https://www.buymeacoffee.com/D4vRAM369"><img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-5F7FFF"/></a>
 </p>
 
+<p align="center">
+  🌐 &nbsp;<strong>Language / Idioma:</strong> &nbsp;
+  <a href="README.md">English 🇬🇧</a> &nbsp;|&nbsp;
+  <strong>Español 🇪🇸</strong>
+</p>
+
 ---
 
 ## ❓ ¿Qué es WhatsMicFix?
