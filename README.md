@@ -17,7 +17,7 @@
   <a href="https://www.buymeacoffee.com/D4vRAM369"><img src="https://img.shields.io/badge/Buy_me_a_coffee-☕-5F7FFF"/></a>
 </p>
 
-[🇪🇸 Spanish version (primary for local community)](#README_spanish.md) | 🌍
+[🇪🇸 [Spanish version (primary for local community)]([url](https://github.com/D4vRAM369/WhatsMicFix/edit/main/README_spanish-version.md)) | 🌍
 
 ## ❓ What is WhatsMicFix?
 
