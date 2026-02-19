@@ -127,7 +127,7 @@ Está pensado principalmente para **usuarios avanzados con root y LSPosed**, y h
 | **Audios consecutivos OK**     | ~95 %                   | ✅ 100 % |
 | **Alertas “formato inválido”** | 1–2 por sesión           | 🚫 0 |
 | **Tiempo de hook**             | Variable                 | ⚡ Consistente |
-| **Logs de diagnóstico**        | Limitados                | 🧠 Completos |
+
 
 ---
 
