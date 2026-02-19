@@ -104,7 +104,6 @@ It is primarily intended for **advanced users with root and LSPosed**, and has b
 | **Consecutive audios OK**     | ~95 %         | ✅ 100 %       |
 | **"Invalid format" alerts**   | 1–2 per session | 🚫 0         |
 | **Hook timing**               | Variable      | ⚡ Consistent  |
-| **Diagnostic logs**           | Limited       | 🧠 Full        |
 
 ---
 ## 📚 Technical Notes
